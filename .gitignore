@@ -1,0 +1,22 @@
+# Configuration files with sensitive data
+config.py
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env
+.venv
+venv/
+ENV/
+
+# Storage directory for cached embeddings
+storage/
+
+# PDF files (optional - remove if you want to track PDFs)
+*.pdf
