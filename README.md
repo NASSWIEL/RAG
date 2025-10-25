@@ -71,4 +71,4 @@ Your question: quit
 - Python 3.10+
 - Dependencies: `google-generativeai`, `llama-index`, `llama-index-embeddings-huggingface`, `llama-index-llms-gemini`, `llama-index-readers-file`, `sentence-transformers`, `torch`, `pypdf`
 
->>>>>>> 75ea318 (add files)
+
