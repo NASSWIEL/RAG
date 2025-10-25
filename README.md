@@ -1,7 +1,5 @@
-<<<<<<< HEAD
 # RAG
-=======
-# imp-RAG
+
 
 A Retrieval-Augmented Generation (RAG) system that enables intelligent question-answering from PDF documents using state-of-the-art embeddings and Google's Gemini LLM.
 
@@ -72,4 +70,5 @@ Your question: quit
 
 - Python 3.10+
 - Dependencies: `google-generativeai`, `llama-index`, `llama-index-embeddings-huggingface`, `llama-index-llms-gemini`, `llama-index-readers-file`, `sentence-transformers`, `torch`, `pypdf`
+
 >>>>>>> 75ea318 (add files)
