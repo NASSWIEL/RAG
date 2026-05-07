@@ -33,10 +33,10 @@ The system consists of several components:
 
 ## Installation
 
-Install dependencies with:
+Ce projet utilise [`uv`](https://github.com/astral-sh/uv) comme gestionnaire de paquets. Installez les dépendances avec :
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Configuration
@@ -68,7 +68,7 @@ Your question: quit
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.12+
 - Dependencies: `google-generativeai`, `llama-index`, `llama-index-embeddings-huggingface`, `llama-index-llms-gemini`, `llama-index-readers-file`, `sentence-transformers`, `torch`, `pypdf`
 
 
