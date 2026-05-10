@@ -124,7 +124,7 @@ flowchart LR
 | `RAGEngine` | Module / Classe | `rag_engine.py` | Orchestrateur : indexation, cache, requête | URL PDF, question texte | Réponse texte générée |
 | `pdf_loader` | Module | `pdf_loader.py` | Téléchargement et parsing PDF | URL HTTP | Liste de documents LlamaIndex |
 | `text_processor` | Module | `text_processor.py` | Configuration embeddings et chunking | — | `HuggingFaceEmbedding`, `SentenceSplitter` |
-| `gemini_client` | Module | `gemini_client.py` | Initialisation du LLM Gemini | `GOOGLE_API_KEY` (config) | Instance `Gemini` LlamaIndex |
+| `gemini_client` | Module | `gemini_client.py` | Initialisation, accès singleton et utilitaires LLM Gemini (`initialize_gemini_llm`, `get_llm`, `generate_text`, `summarize`, `rerank_passages`, `reset_llm`) | `GOOGLE_API_KEY` (config), prompt texte | Instance `Gemini` LlamaIndex, texte généré, passages rerankés |
 | `VectorStoreIndex` | Lib (LlamaIndex) | `./storage/` | Index vectoriel persisté sur disque | Documents chunké + embeddings | Résultats de recherche sémantique |
 
 ### 4.1 Détails par composant
@@ -141,11 +141,21 @@ flowchart LR
 
 #### `gemini_client` (`gemini_client.py`)
 
-- **Rôle** : Instancie le LLM Gemini (`gemini-2.5-flash`, température 0.1) et l'injecte dans les `Settings` globaux de LlamaIndex.
-- **Entrées** : `GOOGLE_API_KEY` importée depuis `config.py`
-- **Sorties** : Instance `Gemini` assignée à `Settings.llm`
+- **Rôle** : Module LLM à responsabilité élargie — initialise le LLM Gemini (`gemini-2.5-flash`, température 0.1 par défaut), gère un singleton via `_llm_cache` (liste interne d'un élément), et expose une API utilitaire complète.
+- **Fonctions publiques** :
+  - `initialize_gemini_llm(model, temperature, max_tokens)` — crée l'instance `Gemini`, l'assigne à `Settings.llm` et la stocke dans `_llm_cache`.
+  - `get_llm()` — accesseur singleton ; appelle `initialize_gemini_llm()` avec les défauts si le cache est vide.
+  - `generate_text(prompt, temperature)` — génération texte brute (prompt → str) sans contexte RAG ; crée une instance temporaire si `temperature` est fourni.
+  - `summarize(text, max_words)` — condensation d'un texte via `generate_text`.
+  - `rerank_passages(query, passages)` — rerankeur zero-shot LLM : demande à Gemini d'ordonner les passages par pertinence ; retombe sur l'ordre original en cas d'échec de parsing.
+  - `reset_llm()` — vide `_llm_cache` ; utile pour l'isolation entre tests.
+- **Entrées** : `GOOGLE_API_KEY` importée depuis `config.py`, paramètres `model` / `temperature` / `max_tokens`, prompt texte, passages à reranker.
+- **Sorties** : Instance `Gemini` (via `initialize_gemini_llm` / `get_llm`), `str` (via `generate_text` / `summarize`), `list[str]` (via `rerank_passages`).
 - **Dépendances externes** : Google Gemini API (`llama-index-llms-gemini`)
-- **Pièges connus** : ⚠️ `config.py` n'est pas versionné (absent du dépôt) — la clé API doit être fournie manuellement avant exécution
+- **Pièges connus** :
+  - ⚠️ `config.py` n'est pas versionné (absent du dépôt) — la clé API doit être fournie manuellement avant exécution.
+  - ⚠️ `generate_text` avec `temperature` instancie un objet `Gemini` temporaire (hors singleton) à chaque appel — légère surcharge réseau possible.
+  - ⚠️ `rerank_passages` dépend du format de réponse textuel du LLM — fragile si Gemini renvoie un texte inattendu (fallback sur ordre original).
 
 ---
 

@@ -42,7 +42,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Commandes CLI** | 1 | [main.py](../main.py) |
 | **Jobs / batchs** | 0 | — |
 | **Fichiers E/S (formats fixes)** | 1 | [§9](#9-formats-des-es-physiques) |
-| **API Python publique** | 1 classe | [rag_engine.py](../rag_engine.py) |
+| **API Python publique** | 1 classe + 1 module | [rag_engine.py](../rag_engine.py), [gemini_client.py](../gemini_client.py) |
 
 ---
 
@@ -171,6 +171,71 @@ Bloc « Mode d'emploi » en fin de fichier.
 
 - ⚠️ Toute erreur de l'API Gemini (quota, réseau) est propagée sans gestion dans le code source actuel.
 
+### 2.2 `gemini_client` — API Python publique (module)
+
+> Source : [gemini_client.py](../gemini_client.py)
+
+Constantes de configuration par défaut :
+
+| Constante | Valeur |
+|---|---|
+| `_DEFAULT_MODEL` | `"models/gemini-2.5-flash"` |
+| `_DEFAULT_TEMPERATURE` | `0.1` |
+| `_DEFAULT_MAX_TOKENS` | `1024` |
+
+#### `initialize_gemini_llm(model, temperature, max_tokens) -> Gemini` — Initialise et configure le LLM singleton
+
+| Paramètre | Type | Obligatoire | Défaut | Description |
+|---|---|---|---|---|
+| `model` | `str` | Non | `"models/gemini-2.5-flash"` | Identifiant du modèle Gemini |
+| `temperature` | `float` | Non | `0.1` | Température d'échantillonnage (0 = déterministe, 1 = créatif) |
+| `max_tokens` | `int` | Non | `1024` | Nombre maximal de tokens générés |
+
+**Retour** : instance `Gemini` configurée, enregistrée dans `Settings.llm` (LlamaIndex) et dans le singleton interne `_llm_cache`.
+
+**Effets de bord** : écrase le singleton en cours ; met à jour `Settings.llm` globalement.
+
+#### `get_llm() -> Gemini` — Retourne l'instance LLM active (avec initialisation paresseuse)
+
+Appelle `initialize_gemini_llm()` avec les valeurs par défaut si le singleton est vide. Aucun paramètre.
+
+#### `generate_text(prompt: str, temperature: float | None = None) -> str` — Génération de texte libre sans contexte RAG
+
+| Paramètre | Type | Obligatoire | Défaut | Description |
+|---|---|---|---|---|
+| `prompt` | `str` | Oui | — | Invite envoyée à Gemini |
+| `temperature` | `float \| None` | Non | `None` | Si fourni, crée une instance temporaire à cette température sans remplacer le singleton |
+
+**Retour** : `str` — texte généré par Gemini.
+
+**Lève** : `ValueError` si `prompt` est vide.
+
+**Pièges** : ⚠️ Un `temperature` non nul crée une instance Gemini temporaire ; les erreurs d'API Gemini sont propagées sans retry.
+
+#### `summarize(text: str, max_words: int = 150) -> str` — Résumé d'un bloc de texte
+
+| Paramètre | Type | Obligatoire | Défaut | Description |
+|---|---|---|---|---|
+| `text` | `str` | Oui | — | Texte à résumer |
+| `max_words` | `int` | Non | `150` | Longueur cible approximative du résumé en mots |
+
+**Retour** : `str` — résumé concis. **Lève** : `ValueError` si `text` est vide.
+
+#### `rerank_passages(query: str, passages: list[str]) -> list[str]` — Reranking de passages par pertinence via LLM
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `query` | `str` | Oui | Question utilisateur |
+| `passages` | `list[str]` | Oui | Passages à réordonner |
+
+**Retour** : `list[str]` — passages réordonnés du plus au moins pertinent. En cas d'échec de parsing de la réponse LLM, retourne l'ordre d'entrée inchangé.
+
+**Pièges** : ⚠️ Utilise `temperature=0.0` pour le reranking ; la fiabilité dépend du respect du format de sortie par le modèle.
+
+#### `reset_llm() -> None` — Vide le singleton LLM
+
+Efface `_llm_cache`. Principalement utile en tests pour éviter la fuite d'état entre cas de test. Aucun paramètre, aucun retour.
+
 ---
 
 ## 3. APIs consommées
@@ -239,10 +304,12 @@ answer = rag.query(user_query)    # interroge : VectorStoreIndex → Gemini LLM
 | Appelant ↓ / Appelé → | `RAGEngine` | `pdf_loader` | `text_processor` | `gemini_client` | Google Gemini API | Source PDF (HTTP) |
 |---|---|---|---|---|---|---|
 | **`main.py`** | ✓ | — | — | — | — | — |
-| **`RAGEngine`** | — | (c) | ✓ | ✓ | ✓ | — |
+| **`RAGEngine`** | — | (c) | ✓ | ✓ (`initialize_gemini_llm`, `get_llm`) | ✓ (via `gemini_client`) | — |
 | **`pdf_loader`** | — | — | — | — | — | (c) |
+| **`gemini_client`** | — | — | — | — | ✓ (`generate_text`, `summarize`, `rerank_passages`) | — |
 
 > `pdf_loader` appelle la source PDF uniquement lors de la première indexation (absence de cache).
+> `gemini_client` expose également `generate_text`, `summarize` et `rerank_passages` comme utilitaires autonomes appelables hors du pipeline `RAGEngine`.
 
 ---
 
