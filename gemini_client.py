@@ -128,7 +128,7 @@ def rerank_passages(query: str, passages: list[str]) -> list[str]:
         f"Passages:\n{numbered}\n\n"
         "Return ONLY a comma-separated list of the passage numbers ordered from most "
         "to least relevant to the query (e.g. '3,1,2'). No explanation."
-    )
+    )sdsdsds
     raw = generate_text(prompt, temperature=0.0).strip()
     try:
         indices = [int(x.strip()) - 1 for x in raw.split(",")]
