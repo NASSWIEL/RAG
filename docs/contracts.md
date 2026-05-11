@@ -171,7 +171,12 @@ Bloc « Mode d'emploi » en fin de fichier.
 
 | Fonction | Module | Rôle |
 |---|---|---|
-| `initialize_gemini_llm() -> Gemini` | [gemini_client.py](../gemini_client.py) | Crée et enregistre le LLM Gemini dans Settings |
+| `initialize_gemini_llm(model="models/gemini-2.5-flash", temperature=0.1, max_tokens=1024) -> Gemini` | [gemini_client.py](../gemini_client.py) | Crée et enregistre le LLM Gemini dans LlamaIndex Settings ; retourne l'instance |
+| `get_llm() -> Gemini` | [gemini_client.py](../gemini_client.py) | Retourne le singleton LLM courant, l'initialisant avec les valeurs par défaut si absent |
+| `generate_text(prompt: str, temperature: float \| None = None) -> str` | [gemini_client.py](../gemini_client.py) | Génère une réponse texte pour un prompt simple, sans contexte RAG |
+| `summarize(text: str, max_words: int = 150) -> str` | [gemini_client.py](../gemini_client.py) | Résume le texte fourni via Gemini dans une limite approximative de mots |
+| `rerank_passages(query: str, passages: list[str]) -> list[str]` | [gemini_client.py](../gemini_client.py) | Demande à Gemini de reclasser les passages récupérés par pertinence par rapport à la requête |
+| `reset_llm() -> None` | [gemini_client.py](../gemini_client.py) | Réinitialise le singleton LLM du module à `None` |
 | `setup_advanced_text_processing() -> HuggingFaceEmbedding` | [text_processor.py](../text_processor.py) | Configure l'embedding `BAAI/bge-small-en-v1.5` + chunk settings |
 | `create_node_parser() -> SentenceSplitter` | [text_processor.py](../text_processor.py) | Crée un `SentenceSplitter(chunk_size=512, chunk_overlap=50)` |
 | `load_pdf_from_url(url: str) -> str` | [pdf_loader.py](../pdf_loader.py) | Télécharge le PDF (timeout 30 s) vers un fichier temp ; retourne le chemin |
