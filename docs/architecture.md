@@ -125,9 +125,19 @@ flowchart LR
 | `RAGEngine` | Orchestrateur | [`rag_engine.py`](../rag_engine.py) | Indexation, cache, query pipeline | URL PDF, question texte | Réponse texte |
 | `pdf_loader` | Module I/O | [`pdf_loader.py`](../pdf_loader.py) | Téléchargement et extraction PDF | URL HTTP | Liste de `Document` LlamaIndex |
 | `text_processor` | Module ML | [`text_processor.py`](../text_processor.py) | Configuration embeddings et chunking | — (configure `Settings` global) | `HuggingFaceEmbedding`, `SentenceSplitter` |
-| `gemini_client` | Module LLM | [`gemini_client.py`](../gemini_client.py) | Initialisation du LLM Gemini | Clé API (`config.py`) | `Gemini` LLM instance |
+| `gemini_client` | Module LLM | [`gemini_client.py`](../gemini_client.py) | Initialisation, accès singleton, génération de texte, résumé et re-ranking via Gemini | Clé API (`config.py`), prompt texte | `Gemini` LLM instance, texte généré, passages re-rankés |
 
 ### 4.1 Détails par composant
+
+#### gemini_client
+
+- **Rôle** : Fournit un singleton `Gemini` LLM (modèle `models/gemini-2.5-flash`, température 0.1, max_tokens 1024 par défaut) et expose des fonctions utilitaires de haut niveau : génération de texte libre (`generate_text`), résumé (`summarize`), re-ranking de passages (`rerank_passages`), accès au singleton (`get_llm`), et réinitialisation (`reset_llm`).
+- **Pattern** : Singleton paresseux via dictionnaire `_llm_state` — évite les effets de bord au niveau module.
+- **Entrées** : Clé API Google (`config.py`), paramètres optionnels `model`, `temperature`, `max_tokens`
+- **Sorties** : Instance `Gemini`, chaînes de texte générées, listes de passages re-rankés
+- **Dépendances internes** : `config.GOOGLE_API_KEY`
+- **Dépendances externes** : Google Gemini API (`llama-index-llms-gemini`)
+- **Constantes par défaut** : `_DEFAULT_MODEL = "models/gemini-2.5-flash"`, `_DEFAULT_TEMPERATURE = 0.1`, `_DEFAULT_MAX_TOKENS = 1024`
 
 #### RAGEngine
 
