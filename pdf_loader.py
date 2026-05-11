@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import os
 
-def load_pdf_from_url(url):
+def load_pdf_from_url(url)::
     print(f"Downloading PDF from {url}...")
     response = requests.get(url)
     
