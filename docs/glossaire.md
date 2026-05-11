@@ -26,7 +26,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Mise à jour par** | agent IA (doc-patcher) |
 | **PR de référence** | fcd7a06 |
 | **Périmètre** | Pipeline RAG — indexation PDF, embeddings, requêtage LLM |
-
+commentwwwwww
 > Source de vérité du vocabulaire projet. Termes marqués **(à confirmer)** = déductions à valider. Marqués **(legacy)** = conservés pour compatibilité, à ne pas reproduire.
 
 ---
