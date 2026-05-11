@@ -33,11 +33,19 @@ The system consists of several components:
 
 ## Installation
 
-Install dependencies with:
+Le projet utilise `pyproject.toml` avec un runner `venv`. Installez les dépendances de production :
 
 ```bash
 pip install -r requirements.txt
 ```
+
+Pour installer les dépendances de développement (tests, linting, analyse statique) :
+
+```bash
+pip install --group dev -e .
+```
+
+Les outils de développement inclus sont : `bandit`, `gitlint-core`, `pyright`, `pytest`, `pytest-cov`, `ruff`.
 
 ## Configuration
 
@@ -68,7 +76,8 @@ Your question: quit
 
 ## Requirements
 
-- Python 3.10+
-- Dependencies: `google-generativeai`, `llama-index`, `llama-index-embeddings-huggingface`, `llama-index-llms-gemini`, `llama-index-readers-file`, `sentence-transformers`, `torch`, `pypdf`
+- Python 3.12+
+- Dépendances de production : `google-generativeai`, `llama-index`, `llama-index-embeddings-huggingface`, `llama-index-llms-gemini`, `llama-index-readers-file`, `sentence-transformers`, `torch`, `pypdf`
+- Dépendances de développement : `bandit>=1.9.4`, `gitlint-core>=0.19.1`, `pyright>=1.1.409`, `pytest>=9.0.3`, `pytest-cov>=7.1.0`, `ruff>=0.15.12`
 
 
