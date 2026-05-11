@@ -25,7 +25,7 @@ Le bloc "Mode d'emploi" en fin de fichier détaille la marche à suivre pour l'I
 |---|---|
 | **Dernière mise à jour** | 2026-05-11 |
 | **Mise à jour par** | agent IA (doc-patcher) |
-| **PR de référence** | fcd7a06 |
+| **PR de référence** | fcd7a06 (gemini_client étendu) |
 | **Version applicative** | (à confirmer) |
 | **Statut du document** | Brouillon |
 
@@ -125,7 +125,7 @@ flowchart LR
 | Composant | Type | Localisation | Rôle | Entrées | Sorties |
 |---|---|---|---|---|---|
 | `RAGEngine` | Module / Classe | [`rag_engine.py`](../rag_engine.py) | Orchestration complète : indexation PDF, gestion du cache, query engine | URL PDF (str), répertoire de stockage | Réponse texte (str) |
-| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Initialisation du LLM Gemini et enregistrement dans `Settings` LlamaIndex | Clé API (`config.GOOGLE_API_KEY`) | Instance `Gemini` |
+| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Initialisation du LLM Gemini (singleton), accès lazy, génération de texte autonome, résumé, re-ranking zéro-shot et reset pour les tests | Clé API (`config.GOOGLE_API_KEY`), prompts texte, passages | Instance `Gemini`, texte généré (str), passages re-classés (list[str]) |
 | `pdf_loader` | Module | [`pdf_loader.py`](../pdf_loader.py) | Téléchargement d'un PDF depuis une URL et extraction des documents LlamaIndex | URL HTTP | Liste de `Document` LlamaIndex |
 | `text_processor` | Module | [`text_processor.py`](../text_processor.py) | Configuration des embeddings HuggingFace et du `SentenceSplitter` dans `Settings` | — | Instance `HuggingFaceEmbedding`, instance `SentenceSplitter` |
 | `main` | Point d'entrée | [`main.py`](../main.py) | Boucle interactive CLI | Saisie utilisateur (stdin) | Réponses affichées (stdout) |
@@ -141,6 +141,23 @@ flowchart LR
 - **Dépendances externes** : `llama_index.core` (`VectorStoreIndex`, `StorageContext`, `Settings`), système de fichiers local (`./storage/`).
 - **Invariants** : L'index pour une URL donnée est identifié par `md5(url)` — deux exécutions sur la même URL réutilisent le même cache.
 - **Pièges connus** : ⚠️ Le hash MD5 est calculé sur l'URL brute — une variation mineure d'URL (trailing slash, paramètre querystring) génère un index distinct et re-déclenche l'embedding complet.
+
+#### gemini_client
+
+- **Rôle** : Fournit toutes les interactions avec Gemini dans un module autonome. Gère un singleton `_llm_instance` (liste à un élément, pattern évitant `global`) ; expose des utilitaires de haut niveau réutilisables indépendamment du pipeline RAG.
+- **Fonctions publiques** :
+  | Fonction | Signature simplifiée | Description |
+  |---|---|---|
+  | `initialize_gemini_llm` | `(model, temperature, max_tokens) → Gemini` | Crée et enregistre l'instance LLM dans `Settings` LlamaIndex ; met à jour le singleton. |
+  | `get_llm` | `() → Gemini` | Accesseur lazy — initialise avec les valeurs par défaut si le singleton est `None`. |
+  | `generate_text` | `(prompt, temperature) → str` | Génération de texte autonome (hors RAG). Si `temperature` est fourni, crée une instance temporaire sans remplacer le singleton. |
+  | `summarize` | `(text, max_words) → str` | Résumé en langue naturelle via `generate_text`. |
+  | `rerank_passages` | `(query, passages) → list[str]` | Re-classement zéro-shot des passages par pertinence ; retourne l'ordre original en cas d'échec de parsing. |
+  | `reset_llm` | `() → None` | Remet le singleton à `None` — usage test/reset uniquement. |
+- **Dépendances internes** : `config.GOOGLE_API_KEY`.
+- **Dépendances externes** : `llama_index.llms.gemini.Gemini`, `llama_index.core.Settings`, Google Gemini API.
+- **Invariants** : Un seul appel réseau Gemini par invocation de `generate_text` — pas de retry interne.
+- **Pièges connus** : ⚠️ `generate_text` avec `temperature` non nul instancie un objet `Gemini` temporaire à chaque appel (coût de construction à évaluer si appelé en boucle). ⚠️ `rerank_passages` consomme un appel LLM complet pour le re-classement — surveiller les coûts API en cas d'usage intensif.
 
 ---
 

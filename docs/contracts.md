@@ -42,7 +42,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Commandes CLI** | 1 (`python main.py`) | [README.md](../README.md) |
 | **Jobs / batchs** | 0 | — |
 | **Fichiers E/S (formats fixes)** | 1 (PDF en entrée) | [§9](#9-formats-des-es-physiques) |
-| **Appels natifs Python (publics)** | 4 | Docstrings — voir §2 |
+| **Appels natifs Python (publics)** | 9 | Docstrings — voir §2 |
 
 ---
 
@@ -174,13 +174,76 @@ Bloc « Mode d'emploi » en fin de fichier.
 
 **Code source** : [`gemini_client.py`](../gemini_client.py)
 
-#### `initialize_gemini_llm()` — Initialisation du LLM Gemini
+#### `initialize_gemini_llm(model, temperature, max_tokens)` — Initialisation et configuration du LLM Gemini
 
-**Paramètres** : aucun (lit `GOOGLE_API_KEY` depuis `config.py`).
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `model` | `str` | Oui | Identifiant du modèle Gemini à utiliser (ex. `"models/gemini-2.5-flash"`) |
+| `temperature` | `float` | Oui | Température de génération |
+| `max_tokens` | `int` | Oui | Nombre maximum de tokens en sortie |
 
-**Retour** : `Gemini` — instance LlamaIndex configurée avec `model="models/gemini-2.5-flash"` et `temperature=0.1`.
+**Retour** : `Gemini` — instance LlamaIndex configurée et assignée à `Settings.llm`.
 
 **Effets de bord** : mutation globale de `Settings.llm`. Nécessite `GOOGLE_API_KEY` valide dans `config.py`.
+
+---
+
+#### `get_llm()` — Accès au singleton LLM
+
+**Paramètres** : aucun.
+
+**Retour** : `Gemini` — instance LLM courante ; si le singleton n'est pas encore initialisé, il est créé avec les valeurs par défaut avant d'être retourné.
+
+**Effets de bord** : peut appeler `initialize_gemini_llm()` avec les valeurs par défaut si le singleton est `None`.
+
+---
+
+#### `generate_text(prompt, temperature=None)` — Génération de texte brut
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `prompt` | `str` | Oui | Invite envoyée au modèle |
+| `temperature` | `float \| None` | Non (défaut `None`) | Surcharge de température pour cette requête uniquement |
+
+**Retour** : `str` — réponse texte brute du modèle, sans contexte RAG.
+
+**Effets de bord** : appel API Google Gemini (réseau, latence variable).
+
+---
+
+#### `summarize(text, max_words=150)` — Résumé de texte
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `text` | `str` | Oui | Texte à résumer |
+| `max_words` | `int` | Non (défaut `150`) | Longueur cible approximative du résumé en mots |
+
+**Retour** : `str` — résumé généré par Gemini d'une longueur approximative de `max_words` mots.
+
+**Effets de bord** : appel API Google Gemini (réseau, latence variable).
+
+---
+
+#### `rerank_passages(query, passages)` — Reclassement de passages par pertinence
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `query` | `str` | Oui | Requête de référence pour le reclassement |
+| `passages` | `list[str]` | Oui | Liste de passages à reclasser |
+
+**Retour** : `list[str]` — passages réordonnés par ordre décroissant de pertinence selon Gemini.
+
+**Effets de bord** : appel API Google Gemini (réseau, latence variable).
+
+---
+
+#### `reset_llm()` — Réinitialisation du singleton LLM
+
+**Paramètres** : aucun.
+
+**Retour** : `None`.
+
+**Effets de bord** : positionne le singleton LLM du module à `None` ; le prochain appel à `get_llm()` forcera une nouvelle initialisation.
 
 ---
 
@@ -225,11 +288,18 @@ Les composants communiquent par appels de fonctions Python directs dans le même
 engine = RAGEngine(pdf_url="https://...")
 
 # RAGEngine.__init__ appelle en séquence :
-#   text_processor.setup_advanced_text_processing()  → Settings.embed_model
-#   gemini_client.initialize_gemini_llm()            → Settings.llm
-#   text_processor.create_node_parser()              → Settings.node_parser
-#   pdf_loader.load_pdf_from_url(pdf_url)            → chemin local
-#   pdf_loader.load_documents_from_pdf(pdf_path)     → list[Document]
+#   text_processor.setup_advanced_text_processing()           → Settings.embed_model
+#   gemini_client.initialize_gemini_llm(model, temp, tokens)  → Settings.llm
+#   text_processor.create_node_parser()                       → Settings.node_parser
+#   pdf_loader.load_pdf_from_url(pdf_url)                     → chemin local
+#   pdf_loader.load_documents_from_pdf(pdf_path)              → list[Document]
+
+# Accès ultérieur au LLM via le singleton :
+#   gemini_client.get_llm()          → Gemini (initialisation automatique si nécessaire)
+#   gemini_client.generate_text(...) → str   (génération sans contexte RAG)
+#   gemini_client.summarize(...)     → str   (résumé)
+#   gemini_client.rerank_passages(...) → list[str]
+#   gemini_client.reset_llm()        → None  (réinitialise le singleton)
 
 answer = engine.query("Ma question")
 ```
@@ -304,7 +374,7 @@ answer = engine.query("Ma question")
 
 ## 13. Recommandations actives
 
-1. **Isoler la mutation de `Settings` LlamaIndex** — Les fonctions `setup_advanced_text_processing()`, `initialize_gemini_llm()` et `create_node_parser()` mutent un état global (`Settings`). En cas d'usage multi-thread ou multi-instance, ce couplage implicite peut causer des comportements inattendus. Envisager de passer les paramètres explicitement plutôt que via `Settings`.
+1. **Isoler la mutation de `Settings` LlamaIndex** — Les fonctions `setup_advanced_text_processing()`, `initialize_gemini_llm()` et `create_node_parser()` mutent un état global (`Settings`). En cas d'usage multi-thread ou multi-instance, ce couplage implicite peut causer des comportements inattendus. Envisager de passer les paramètres explicitement plutôt que via `Settings`. Le singleton géré par `get_llm()` / `reset_llm()` suit le même schéma : `reset_llm()` permet de forcer une réinitialisation entre deux scénarios de test, mais n'est pas thread-safe (à confirmer).
 2. **Ajouter une gestion d'erreur réseau** — `load_pdf_from_url` et l'appel Gemini ne disposent d'aucun retry ni fallback. Un timeout réseau ou une indisponibilité de l'API entraîne un crash non géré.
 3. **Sécuriser `GOOGLE_API_KEY`** — La clé est lue depuis `config.py` en clair ; préférer une variable d'environnement ou un gestionnaire de secrets.
 
