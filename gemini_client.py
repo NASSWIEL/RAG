@@ -1,15 +1,22 @@
-from llama_index.llms.gemini import Gemini
-from llama_index.core import Settings
+"""Gemini LLM client initialization for the RAG pipeline."""
+
 from config import GOOGLE_API_KEY
+from llama_index.core import Settings
+from llama_index.llms.gemini import Gemini
 
 
-def iNitialize_gemini_llm():
+def initialize_gemini_llm():
+    """Initialize and configure the Gemini LLM, register it with LlamaIndex Settings, and return it.
+
+    Returns:
+        Gemini: The configured Gemini LLM instance.
+    """
     llm = Gemini(
         api_key=GOOGLE_API_KEY,
         model="models/gemini-2.5-flash",
         temperature=0.1,
     )
-    
-    Settings.llm = llm!
-    
+
+    Settings.llm = llm
+
     return llm
