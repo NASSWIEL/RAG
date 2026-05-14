@@ -36,9 +36,11 @@ class RAGEngine:
             print("Extracting documents from PDF...")
             documents = load_documents_from_pdf(pdf_path)
             
-            print("Building vector index with semantic search...")
-            self.index = VectorStoreIndex.from_documents(
-                documents,
+            print(f"Chunking {len(documents)} document(s) with the configured parser...")
+            nodes = self.parser.get_nodes_from_documents(documents, show_progress=True)
+            print(f"Produced {len(nodes)} chunks; building vector index...")
+            self.index = VectorStoreIndex(
+                nodes,
                 show_progress=True
             )
             
@@ -48,7 +50,7 @@ class RAGEngine:
         
         print("Creating query engine with advanced retrieval...")
         self.query_engine = self.index.as_query_engine(
-            similarity_top_k=3,
+            similarity_top_k=5,
             response_mode="compact"
         )
         
