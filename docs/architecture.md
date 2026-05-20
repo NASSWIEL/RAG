@@ -96,7 +96,7 @@ Monolithe procédural — 5 modules Python à la racine du dépôt, sans couche 
 flowchart LR
     User([Utilisateur CLI]) --> main[main.py]
     main --> RAGEngine[rag_engine.py\nRAGEngine]
-    RAGEngine --> gemini[gemini_client.py\ninitialize_gemini_llm]
+    RAGEngine --> gemini[gemini_client.py\ninitialize_gemini_llm / get_llm\ngenerate_text / summarize\nrerank_passages / reset_llm]
     RAGEngine --> text[text_processor.py\nsetup_advanced_text_processing\ncreate_node_parser]
     RAGEngine --> pdf[pdf_loader.py\nload_pdf_from_url\nload_documents_from_pdf]
     RAGEngine --> storage[(./storage/\nVector store disque)]
@@ -125,7 +125,7 @@ flowchart LR
 | Composant | Type | Localisation | Rôle | Entrées | Sorties |
 |---|---|---|---|---|---|
 | `RAGEngine` | Module (classe) | [`rag_engine.py`](../rag_engine.py) | Orchestrateur principal — indexation, cache et requêtage | URL PDF, question utilisateur | Réponse texte |
-| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Initialise le LLM Gemini et le configure dans LlamaIndex Settings | `GOOGLE_API_KEY` (config) | Instance `Gemini` enregistrée dans `Settings.llm` |
+| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Initialise et expose le LLM Gemini via un singleton `_state` ; fournit génération de texte, résumé et reranking | `GOOGLE_API_KEY` (config), prompts texte, passages | Instance `Gemini` singleton (`Settings.llm`), réponses texte, passages reclassés |
 | `pdf_loader` | Module | [`pdf_loader.py`](../pdf_loader.py) | Télécharge un PDF depuis une URL et l'extrait en documents LlamaIndex | URL HTTP | Liste de `Document` LlamaIndex |
 | `text_processor` | Module | [`text_processor.py`](../text_processor.py) | Configure le modèle d'embedding HuggingFace et le `SentenceSplitter` | — | `HuggingFaceEmbedding`, `SentenceSplitter` |
 | `main` | Module (CLI) | [`main.py`](../main.py) | Point d'entrée — instancie `RAGEngine` et boucle interactive | Saisie clavier | Affichage console |
@@ -142,6 +142,22 @@ flowchart LR
 - **Dépendances externes** : LlamaIndex (`VectorStoreIndex`, `StorageContext`), filesystem `./storage/`
 - **Invariants** : Un même URL produit toujours le même chemin d'index (hash MD5) — pas de duplication d'index
 - **Pièges connus** : Le hash MD5 est calculé sur l'URL brute ; deux URLs pointant vers le même contenu produisent deux index distincts. ⚠️ `config.py` doit exister et contenir `GOOGLE_API_KEY` avant tout appel.
+
+#### gemini_client
+
+- **Rôle** : Fournit l'accès au LLM Google Gemini via un singleton module-level (`_state` dict) et expose 6 fonctions publiques.
+- **Fonctions publiques** :
+  | Fonction | Rôle |
+  |---|---|
+  | `initialize_gemini_llm(model, temperature, max_tokens)` | Crée et enregistre l'instance `Gemini` dans `Settings.llm` ; remplace le singleton courant |
+  | `get_llm()` | Retourne le singleton courant, l'initialise avec les défauts si absent |
+  | `generate_text(prompt, temperature)` | Génère une réponse texte hors contexte RAG ; crée une instance temporaire si `temperature` est fourni |
+  | `summarize(text, max_words)` | Résume un texte en ~`max_words` mots via `generate_text` |
+  | `rerank_passages(query, passages)` | Reclasse des passages par pertinence en mode zero-shot ; repli sur l'ordre original en cas d'échec de parsing |
+  | `reset_llm()` | Vide le singleton — le prochain appel à `get_llm()` ré-initialisera |
+- **Constantes** : `_DEFAULT_MODEL = "models/gemini-2.5-flash"`, `_DEFAULT_TEMPERATURE = 0.1`, `_DEFAULT_MAX_TOKENS = 1024`
+- **Pattern** : Singleton via dict `_state` (évite l'instruction `global` — PLW0603)
+- **Dépendances externes** : `llama_index.llms.gemini.Gemini`, `llama_index.core.Settings`, `config.GOOGLE_API_KEY`
 
 ---
 
