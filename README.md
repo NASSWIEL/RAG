@@ -22,7 +22,7 @@ The system consists of several components:
 - **`rag_engine.py`**: Core RAG orchestrator — manages indexing, storage, and query pipeline
 - **`pdf_loader.py`**: Downloads PDFs and extracts document content
 - **`text_processor.py`**: Advanced text chunking and embedding configuration
-- **`gemini_client.py`**: Initializes and configures the Gemini LLM
+- **`gemini_client.py`**: Initializes and configures the Gemini LLM; exposes public API — `get_llm()`, `generate_text()`, `summarize()`, `rerank_passages()`, `reset_llm()`
 - **`main.py`**: Interactive CLI entry point
 
 ### How It Works
@@ -36,7 +36,13 @@ The system consists of several components:
 Install dependencies with:
 
 ```bash
-pip install -r requirements.txt
+uv sync
+```
+
+Or run directly without a separate install step:
+
+```bash
+uv run python main.py
 ```
 
 ## Configuration
@@ -63,7 +69,15 @@ The default PDF is set to `https://arxiv.org/pdf/2005.11401.pdf`. Modify `pdf_ur
 Your question: What is the main contribution of this paper?
 Answer: [Gemini-generated response based on retrieved context]
 
-Your question: quit
+Your question: q
+```
+
+## Testing
+
+A pytest suite lives in `tests/` (30 tests covering the main modules). Run it with:
+
+```bash
+uv run pytest
 ```
 
 ## Requirements
