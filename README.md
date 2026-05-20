@@ -33,10 +33,16 @@ The system consists of several components:
 
 ## Installation
 
-Install dependencies with:
+Le projet utilise [`uv`](https://docs.astral.sh/uv/) avec un `pyproject.toml` (Python >= 3.12 requis). Pour installer les dépendances :
 
 ```bash
-pip install -r requirements.txt
+uv sync
+```
+
+Pour inclure les dépendances de développement (`bandit`, `pyright`, `pytest`, `pytest-cov`, `ruff`, `gitlint-core`) :
+
+```bash
+uv sync --extra dev
 ```
 
 ## Configuration
@@ -68,7 +74,7 @@ Your question: quit
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.12+
 - Dependencies: `google-generativeai`, `llama-index`, `llama-index-embeddings-huggingface`, `llama-index-llms-gemini`, `llama-index-readers-file`, `sentence-transformers`, `torch`, `pypdf`
 
 
