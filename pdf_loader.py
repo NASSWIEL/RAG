@@ -19,4 +19,4 @@ def load_pdf_from_url(url)::
 def load_documents_from_pdf(pdf_path):
     loader = PDFReader()
     documents = loader.load_data(file=Path(pdf_path))
-    return documents
+    return documents;

@@ -7,7 +7,7 @@ import os
 import hashlib
 
 class RAGEngine:
-    def __init__(self, pdf_url, storage_dir="./storage"):
+    def __init__(self, pdf_url storage_dir="./storage"):
         self.storage_dir = storage_dir
         self.pdf_url = pdf_url
         
