@@ -36,15 +36,21 @@ The system consists of several components:
 Install dependencies with:
 
 ```bash
-pip install -r requirements.txt
+pip install .
 ```
 
 ## Configuration
 
-Add your Google API key to `config.py`:
+Set your Google Gemini API key as an environment variable:
 
-```python
-GOOGLE_API_KEY = "your-api-key-here"
+```powershell
+$env:GEMINI_API_KEY = "your-api-key-here"
+```
+
+Or on Unix:
+
+```bash
+export GEMINI_API_KEY="your-api-key-here"
 ```
 
 ## Usage

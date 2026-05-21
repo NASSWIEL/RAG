@@ -64,7 +64,7 @@ L'utilisateur lance `main.py`. `RAGEngine.__init__` démarre :
 
 | Couche | Choix | Version | Justification courte |
 |---|---|---|---|
-| **Langage principal** | Python | (à confirmer) | Écosystème LLM/ML dominant |
+| **Langage principal** | Python | 3.12 | Écosystème LLM/ML dominant |
 | **Framework RAG** | llama-index-core | (à confirmer) | VectorStoreIndex, Settings, StorageContext |
 | **LLM** | llama-index-llms-gemini / Gemini 2.5 Flash | (à confirmer) | Génération de réponses |
 | **Embedding** | llama-index-embeddings-huggingface / BAAI/bge-small-en-v1.5 | (à confirmer) | Encodage sémantique des chunks |
@@ -128,7 +128,7 @@ flowchart LR
 |---|---|---|---|---|---|
 | `main.py` | Entrypoint CLI | [`main.py`](../main.py) | Boucle interactive Q&A | Saisie utilisateur | Affichage réponse |
 | `RAGEngine` | Module / Orchestrateur | [`rag_engine.py`](../rag_engine.py) | Pipeline complet : indexation + requête | URL PDF, question texte | Réponse string |
-| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Initialise le LLM Gemini dans Settings | Variable d'env `GEMINI_API_KEY` | Instance `Gemini` |
+| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Singleton LLM Gemini ; initialisation, génération de texte brut, résumé, reranking LLM | Variable d'env `GEMINI_API_KEY` | Instance `Gemini`, `str` |
 | `pdf_loader` | Module | [`pdf_loader.py`](../pdf_loader.py) | Télécharge et parse le PDF | URL HTTP | `List[Document]` LlamaIndex |
 | `text_processor` | Module | [`text_processor.py`](../text_processor.py) | Configure embedding + node parser | — | `HuggingFaceEmbedding`, `SentenceSplitter` |
 
@@ -145,6 +145,15 @@ flowchart LR
 - **Pièges connus** :
   - ⚠️ L'URL PDF est hardcodée dans `main.py` (`https://arxiv.org/pdf/2005.11401.pdf`) — toute modification nécessite d'éditer le code source.
   - ⚠️ `GEMINI_API_KEY` est lue via `os.environ[...]` (KeyError si absente) — le processus plante au démarrage sans message explicite.
+
+#### gemini_client
+
+- **Rôle** : Singleton LLM — `initialize_gemini_llm()` instancie et enregistre `Gemini` dans `Settings.llm` ; `get_llm()` retourne le singleton (ou l'initialise à la demande) ; `generate_text()` génère du texte brut depuis un prompt ; `summarize()` résume un texte ; `rerank_passages()` utilise le LLM comme zero-shot reranker sur une liste de passages ; `reset_llm()` vide le singleton.
+- **Paramètres par défaut** : modèle `models/gemini-2.5-flash`, température `0.1`, max_tokens `1024`.
+- **Dépendances externes** : `llama-index-llms-gemini`, variable d'env `GEMINI_API_KEY`.
+- **Pièges connus** :
+  - ⚠️ `os.environ["GEMINI_API_KEY"]` lève un `KeyError` si la variable est absente — pas de message d'erreur explicite.
+  - ⚠️ `rerank_passages()` crée une instance `Gemini` temporaire à température `0.0` ; si le modèle retourne une réponse non parseable, la fonction retourne les passages dans l'ordre original sans erreur.
 
 #### pdf_loader
 
@@ -252,15 +261,23 @@ Aucune cible SLO formalisée actuellement. Facteurs dominants : taille du PDF, l
 
 ## 9. Stratégie de test
 
-Aucune suite de tests formalisée actuellement dans le repo.
+| Outil | Rôle | Config |
+|---|---|---|
+| `pytest` | Exécution des tests unitaires | `testpaths = ["tests"]`, fichiers `test_*.py`, fonctions `test_*` — voir `pyproject.toml` |
+| `pytest-cov` | Couverture de code | Plugin pytest — invocation à confirmer |
+
+Les tests sont attendus dans `tests/`. Aucune suite de tests existante détectée dans le repo à ce jour — la configuration `pyproject.toml` établit le cadre mais les fichiers de tests sont à créer.
 
 ---
 
 ## 10. Workflow de développement
 
-- **Branches** : `main` (à confirmer)
-- **Convention de commits** : (à confirmer)
-- **CI** : Aucune pipeline CI détectée
+- **Branches** : `main`
+- **Convention de commits** : gitlint (`gitlint-core>=0.19.1` en dev dep) — règles à confirmer
+- **Linting / formatage** : ruff (`ruff>=0.15.14`) — ligne max 100, target Python 3.12, conventions Google docstring
+- **Analyse statique** : pyright (`pyright>=1.1.409`) — mode `standard`, Python 3.12, sources `src/` et `tests/`
+- **Sécurité statique** : bandit (`bandit>=1.9.4`) — exclut `tests/`, `.venv/`, `build/`
+- **CI** : Aucune pipeline CI distante détectée — outils configurés pour exécution locale via `pyproject.toml`
 - **Code review** : (à confirmer)
 - **Mise à jour de cette doc** : Skill IA doc-patcher exécuté en pre-PR + relecture humaine.
 

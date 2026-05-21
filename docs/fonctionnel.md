@@ -197,7 +197,7 @@ Forme abrégée. L'utilisateur tape `q` au prompt ; l'application se termine pro
 - **Pré-conditions** : Lancement de l'application.
 - **Effet** : Sans cette clé, l'initialisation du LLM échoue et l'application ne démarre pas.
 - **Origine** : Contrainte du fournisseur LLM (Google Gemini).
-- **Implémentation** : [gemini_client.py:12](gemini_client.py#L12)
+- **Implémentation** : [gemini_client.py:32](gemini_client.py#L32)
 - **Tests fonctionnels** : (à confirmer)
 
 ---

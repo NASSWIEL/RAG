@@ -42,6 +42,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Embedding** | Représentation numérique dense d'un texte produite par un modèle de sentence-transformer. Utilisé pour la recherche sémantique. | `HuggingFaceEmbedding` (modèle `BAAI/bge-small-en-v1.5`) | `text_processor.py` |
 | **Chunk / nœud** | Fragment de texte issu du découpage d'un document PDF, de taille fixe (512 tokens, overlap 50). Unité de base de l'index. | `SentenceSplitter` | `text_processor.py` |
 | **Cache d'index** | Répertoire `./storage/index_<md5>` où l'index vectoriel est persisté pour éviter un re-calcul des embeddings à chaque démarrage. | `_get_index_path()` | `rag_engine.py` |
+| **Reranking** | Étape optionnelle du pipeline RAG qui réordonne les passages récupérés par l'index vectoriel selon leur pertinence effective vis-à-vis de la requête, en interrogeant le LLM. Améliore la précision de la réponse finale. | `rerank_passages()` | `gemini_client.py` |
 
 ### 1.2 Règles de gestion (noms courts)
 

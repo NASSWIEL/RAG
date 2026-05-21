@@ -67,10 +67,12 @@ Pas de codes HTTP normalisés. Les erreurs se propagent comme exceptions Python 
 
 | Situation | Exception attendue |
 |---|---|
-| `GEMINI_API_KEY` absente | `KeyError` dans `initialize_gemini_llm()` |
+| `GEMINI_API_KEY` absente | `KeyError` dans `initialize_gemini_llm()` / `generate_text()` |
 | PDF inaccessible / timeout | `Exception` dans `load_pdf_from_url()` (timeout=30s) |
 | PDF illisible | Exception PDFReader dans `load_documents_from_pdf()` |
 | Index corrompu sur disque | Exception LlamaIndex dans `_load_index()` |
+| `prompt` vide ou whitespace dans `generate_text()` | `ValueError("prompt must not be empty")` |
+| `text` vide ou whitespace dans `summarize()` | `ValueError("text must not be empty")` |
 
 ### 1.4 Format de réponse
 
@@ -153,9 +155,22 @@ answer = rag.query(question)  # -> str
 #   -> str
 ```
 
+**Interface publique de `gemini_client.py`** (à partir du diff) :
+
+| Fonction | Signature | Retour | Remarque |
+|---|---|---|---|
+| `initialize_gemini_llm` | `(model=_DEFAULT_MODEL, temperature=0.1, max_tokens=1024) -> Gemini` | instance `Gemini` | Enregistre dans `Settings.llm` **et** dans le singleton `_state["llm"]` |
+| `get_llm` | `() -> Gemini` | instance `Gemini` | Retourne le singleton ; appelle `initialize_gemini_llm()` si non initialisé |
+| `generate_text` | `(prompt: str, temperature: float \| None = None) -> str` | texte généré | ⚠️ Si `temperature` est fourni, instancie un nouveau `Gemini` temporaire (hors singleton) à chaque appel |
+| `summarize` | `(text: str, max_words: int = 150) -> str` | résumé en prose | Délègue à `generate_text()` |
+| `rerank_passages` | `(query: str, passages: list[str]) -> list[str]` | passages réordonnés | Appelle le LLM avec `temperature=0.0` ; retourne `passages` inchangé en cas d'échec de parsing |
+| `reset_llm` | `() -> None` | — | Remet `_state["llm"]` à `None` ; utile pour les tests |
+
 **Points-clés** :
 
 - `Settings.llm` et `Settings.node_parser` sont mutés globalement dans `initialize_gemini_llm()` et `RAGEngine.__init__` — ⚠️ pas thread-safe si plusieurs `RAGEngine` sont instanciés en parallèle.
+- `gemini_client.py` maintient un singleton module-level (`_state["llm"]`). `get_llm()` évite les ré-initialisations, mais l'état est partagé sur tout le processus — ne pas combiner avec des appels qui changent de modèle sans `reset_llm()`.
+- `generate_text(temperature=x)` crée une instance `Gemini` temporaire distincte ; la clé API est relue depuis `os.environ` à chaque appel dans ce cas.
 - Le cache de l'index est indexé par le hash MD5 de l'URL du PDF : `./storage/index_<md5(pdf_url)>`. Changer l'URL force un re-calcul complet.
 - Pas de propagation de contexte de tracing ni de métriques applicatives.
 
