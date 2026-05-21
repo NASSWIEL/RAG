@@ -41,7 +41,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Topics / queues consommés** | 0 | — |
 | **Commandes CLI** | 1 (`python main.py`) | [main.py](../main.py) |
 | **Jobs / batchs** | 0 | — |
-| **Méthodes publiques (lib native)** | 2 (`RAGEngine.__init__`, `RAGEngine.query`) | [§7](#7-mode-dappel-inter-composants-interne) |
+| **Méthodes publiques (lib native)** | 8 (`RAGEngine.__init__`, `RAGEngine.query`, `initialize_gemini_llm`, `get_llm`, `generate_text`, `summarize`, `rerank_passages`, `reset_llm`) | [§7](#7-mode-dappel-inter-composants-interne) |
 | **Fichiers E/S (formats fixes)** | 1 (PDF en entrée, stockage index sur disque) | [§9](#9-formats-des-es-physiques) |
 
 ---
@@ -185,7 +185,12 @@ Le cœur du système est la classe `RAGEngine`. Les deux méthodes publiques con
 
 | Fonction | Module | Signature | Rôle |
 |---|---|---|---|
-| `initialize_gemini_llm` | [`gemini_client.py`](../gemini_client.py) | `() -> Gemini` | Instancie et enregistre le LLM dans `Settings` |
+| `initialize_gemini_llm` | [`gemini_client.py`](../gemini_client.py) | `(model: str = "models/gemini-2.5-flash", temperature: float = 0.1, max_tokens: int = 1024) -> Gemini` | Instancie et enregistre le LLM singleton dans `Settings` ; retourne l'instance créée |
+| `get_llm` | [`gemini_client.py`](../gemini_client.py) | `() -> Gemini` | Retourne le singleton LLM courant ; appelle `initialize_gemini_llm()` avec les valeurs par défaut si non encore initialisé |
+| `generate_text` | [`gemini_client.py`](../gemini_client.py) | `(prompt: str, temperature: float \| None = None) -> str` | Génère une réponse plain-text sans contexte RAG ; `temperature` surcharge temporaire sans remplacer le singleton. Lève `ValueError` si `prompt` vide |
+| `summarize` | [`gemini_client.py`](../gemini_client.py) | `(text: str, max_words: int = 150) -> str` | Résume `text` en approximativement `max_words` mots via `generate_text`. Lève `ValueError` si `text` vide |
+| `rerank_passages` | [`gemini_client.py`](../gemini_client.py) | `(query: str, passages: list[str]) -> list[str]` | Rerank zero-shot des passages par pertinence à `query` via Gemini ; retourne l'ordre original en cas d'échec de parsing |
+| `reset_llm` | [`gemini_client.py`](../gemini_client.py) | `() -> None` | Réinitialise le singleton LLM à `None`, forçant une ré-initialisation au prochain appel |
 | `load_pdf_from_url` | [`pdf_loader.py`](../pdf_loader.py) | `(url: str) -> str` | Télécharge le PDF et retourne le chemin local |
 | `load_documents_from_pdf` | [`pdf_loader.py`](../pdf_loader.py) | `(pdf_path: str) -> list` | Parse le PDF local en liste de documents LlamaIndex |
 | `setup_advanced_text_processing` | [`text_processor.py`](../text_processor.py) | `() -> HuggingFaceEmbedding` | Configure embeddings `BAAI/bge-small-en-v1.5`, `chunk_size=512`, `chunk_overlap=50` |
@@ -211,6 +216,9 @@ print(answer)
 | **`main.py`** | — | — | — | — | — |
 | **`RAGEngine.__init__`** | ✓ (c) | ✓ | ✓ | ✓ | — |
 | **`RAGEngine.query`** | — | — | — | ✓ | ✓ |
+| **`generate_text`** | — | — | — | — | ✓ |
+| **`summarize`** | — | ✓ (`generate_text`) | — | — | ✓ (indirect) |
+| **`rerank_passages`** | — | ✓ (`generate_text`) | — | — | ✓ (indirect) |
 
 > `pdf_loader` est appelé conditionnellement : uniquement si l'index n'est pas déjà en cache disque.
 

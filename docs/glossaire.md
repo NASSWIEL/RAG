@@ -42,6 +42,9 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Index** | Structure vectorielle persistée sur disque (`./storage/`) qui stocke les embeddings des chunks pour permettre la recherche sémantique | `rag_engine.py` | `rag_engine.py` |
 | **Query** | Question posée par l'utilisateur en langage naturel ; déclenche une recherche sémantique dans l'index puis une génération de réponse | `main.py` | `rag_engine.py`, `main.py` |
 | **Contexte récupéré** | Ensemble des top-k chunks les plus proches sémantiquement de la query ; transmis au LLM pour générer la réponse | `rag_engine.py` | `rag_engine.py`, `gemini_client.py` |
+| **Génération directe** | Appel au LLM sans phase de récupération vectorielle — utilisé pour des tâches comme la reformulation ou le résumé autonome | `gemini_client.generate_text()` | `gemini_client.py` |
+| **Résumé** | Condensation d'un texte brut vers une cible de mots définie, sans contexte RAG | `gemini_client.summarize()` | `gemini_client.py` |
+| **Reranking** | Réordonnancement de passages récupérés par pertinence vis-à-vis de la query, en utilisant le LLM comme reranker zero-shot | `gemini_client.rerank_passages()` | `gemini_client.py` |
 
 ### 1.2 Règles de gestion (noms courts)
 
@@ -221,6 +224,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 |---|---|---|
 | **RAG (Retrieval-Augmented Generation)** | Récupération de contexte documentaire pertinent avant génération LLM — évite les hallucinations | `rag_engine.py` |
 | **Cache par hash d'URL** | L'index est persisté sous une clé dérivée du hash de l'URL PDF ; rechargé si présent | `rag_engine.py` |
+| **Singleton `_state`** | Dictionnaire module-level `{"llm": None}` dans `gemini_client.py` — garantit qu'une seule instance Gemini est créée et réutilisée par les appelants ; réinitialisable via `reset_llm()` | `gemini_client.py` |
 
 ### 6.3 Démarche / process
 
@@ -261,7 +265,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | # | Question | Impact | Owner | Ouverte depuis |
 |---|---|---|---|---|
 | Q1 | Quel modèle HuggingFace exact est utilisé pour les embeddings ? (`sentence-transformers/...`) | Bloquant pour doc complète | (à confirmer) | 2026-05-21 |
-| Q2 | Quelle version de Gemini est configurée dans `gemini_client.py` ? (`gemini-pro`, `gemini-1.5-flash`, …) | Cosmétique | (à confirmer) | 2026-05-21 |
+| Q2 | ~~Quelle version de Gemini est configurée dans `gemini_client.py` ?~~ Résolue : `models/gemini-2.5-flash` (`_DEFAULT_MODEL` dans `gemini_client.py`) | Cosmétique | agent IA | 2026-05-21 |
 | Q3 | La valeur de k dans le top-k retrieval est-elle paramétrable ou fixée ? | Cosmétique | (à confirmer) | 2026-05-21 |
 
 ---

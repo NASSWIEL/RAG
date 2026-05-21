@@ -79,6 +79,9 @@ Interroger manuellement un document PDF long est fastidieux et peu précis. Ce s
 | UC-01 | Indexer un PDF depuis une URL | Utilisateur CLI / Développeur | Ponctuel (premier run) | Critique |
 | UC-02 | Poser une question sur un PDF déjà indexé | Utilisateur CLI | Quotidien | Critique |
 | UC-03 | Réutiliser un index existant (cache) | Utilisateur CLI / Développeur | Quotidien | Standard |
+| UC-04 | Générer du texte sans contexte RAG | Développeur intégrateur | Ponctuel | Standard |
+| UC-05 | Résumer un texte arbitraire | Développeur intégrateur | Ponctuel | Standard |
+| UC-06 | Reclasser des passages par pertinence (reranking LLM) | Développeur intégrateur | Ponctuel | Standard |
 
 ### 3.2 Détail par cas d'usage
 
@@ -167,6 +170,83 @@ Interroger manuellement un document PDF long est fastidieux et peu précis. Ce s
 
 ---
 
+#### UC-04 — Générer du texte sans contexte RAG
+
+| Méta | Valeur |
+|---|---|
+| **Persona** | Développeur intégrateur |
+| **Pré-conditions** | Clé API Google configurée ; `gemini_client` initialisé |
+| **Post-conditions** | Texte généré retourné en chaîne |
+| **Déclencheur** | Appel à `generate_text(prompt, temperature)` depuis le code |
+| **Règles métier appliquées** | RG-04 |
+
+**Scénario nominal**
+
+1. Le développeur appelle `generate_text(prompt)`.
+2. Si `temperature` est fourni, une instance Gemini temporaire est créée sans remplacer le singleton global.
+3. Gemini génère et retourne la réponse textuelle.
+
+**Cas d'erreur métier**
+
+| Cas | Détection | Effet |
+|---|---|---|
+| Prompt vide ou blanc | `ValueError` levée avant tout appel réseau | Arrêt immédiat |
+
+---
+
+#### UC-05 — Résumer un texte arbitraire
+
+| Méta | Valeur |
+|---|---|
+| **Persona** | Développeur intégrateur |
+| **Pré-conditions** | Clé API Google configurée |
+| **Post-conditions** | Résumé d'environ `max_words` mots retourné |
+| **Déclencheur** | Appel à `summarize(text, max_words=150)` depuis le code |
+| **Règles métier appliquées** | RG-05 |
+
+**Scénario nominal**
+
+1. Le développeur appelle `summarize(text)`.
+2. Un prompt est construit demandant un résumé en `max_words` mots (défaut : 150).
+3. `generate_text` est appelé en interne ; le résumé est retourné.
+
+**Cas d'erreur métier**
+
+| Cas | Détection | Effet |
+|---|---|---|
+| Texte vide ou blanc | `ValueError` levée avant tout appel réseau | Arrêt immédiat |
+
+---
+
+#### UC-06 — Reclasser des passages par pertinence (reranking LLM)
+
+| Méta | Valeur |
+|---|---|
+| **Persona** | Développeur intégrateur |
+| **Pré-conditions** | Clé API Google configurée ; liste de passages non vide |
+| **Post-conditions** | Passages retournés dans l'ordre du plus au moins pertinent selon Gemini |
+| **Déclencheur** | Appel à `rerank_passages(query, passages)` depuis le code |
+| **Règles métier appliquées** | RG-06 |
+
+**Scénario nominal**
+
+1. Le développeur appelle `rerank_passages(query, passages)`.
+2. Les passages sont présentés à Gemini numérotés ; le modèle retourne l'ordre préféré sous forme de liste CSV (ex. `3,1,2`).
+3. La liste est parsée et les passages sont retournés dans le nouvel ordre.
+
+**Scénarios alternatifs**
+
+| Variante | Condition | Comportement |
+|---|---|---|
+| Liste vide | `passages == []` | Retourne `[]` immédiatement sans appel API |
+| Échec de parsing | Réponse Gemini non parsable ou indices hors-plage | Retour à l'ordre original (`passages`) |
+
+**Pièges connus**
+
+- ⚠️ Le reranking utilise Gemini à `temperature=0.0` mais reste non-déterministe en cas de réponse mal formatée — le fallback silencieux sur l'ordre original peut masquer des erreurs.
+
+---
+
 ## 4. Règles de gestion
 
 > Toute règle métier nommée. Une RG = une assertion sur le système, formulée en langage métier, idéalement testable.
@@ -178,6 +258,9 @@ Interroger manuellement un document PDF long est fastidieux et peu précis. Ce s
 | RG-01 | Déduplication par hash URL | Indexation | UC-01, UC-03 | Active |
 | RG-02 | Chunking fixe 512 / overlap 50 | Traitement texte | UC-01 | Active |
 | RG-03 | Retrieval top-k = 3 | Requête | UC-02 | Active |
+| RG-04 | Génération sans RAG — prompt direct Gemini | Génération LLM | UC-04 | Active |
+| RG-05 | Résumé avec cible `max_words` (défaut 150) | Génération LLM | UC-05 | Active |
+| RG-06 | Reranking zero-shot via liste CSV Gemini | Requête / Génération LLM | UC-06 | Active |
 
 ### 4.2 Détail par règle
 
@@ -214,6 +297,45 @@ Interroger manuellement un document PDF long est fastidieux et peu précis. Ce s
 - **Effet** : Fenêtre de contexte limitée à 3 chunks en mode `compact`.
 - **Origine** : Paramètre fixe dans `rag_engine.py` — compromis précision / latence.
 - **Implémentation** : [rag_engine.py:54](../rag_engine.py)
+- **Tests fonctionnels** : (à confirmer)
+- **Évolutions** :
+  | Date | PR | Changement |
+  |---|---|---|
+  | 2026-05-21 | (à confirmer) | Création |
+
+#### RG-04 — Génération sans RAG — prompt direct Gemini
+
+- **Énoncé** : `generate_text` envoie un prompt directement à Gemini sans passer par l'index vectoriel. Si `temperature` est spécifié, une instance temporaire est créée sans remplacer le singleton global.
+- **Pré-conditions** : Prompt non vide ; clé API disponible.
+- **Effet** : Texte généré retourné ; singleton inchangé si `temperature` est fourni.
+- **Origine** : Besoin de génération ad-hoc hors pipeline RAG.
+- **Implémentation** : [gemini_client.py:55-82](../gemini_client.py)
+- **Tests fonctionnels** : (à confirmer)
+- **Évolutions** :
+  | Date | PR | Changement |
+  |---|---|---|
+  | 2026-05-21 | (à confirmer) | Création |
+
+#### RG-05 — Résumé avec cible `max_words` (défaut 150)
+
+- **Énoncé** : `summarize` construit un prompt demandant à Gemini un résumé en `max_words` mots (défaut : 150). La longueur est indicative — Gemini peut s'en écarter légèrement.
+- **Pré-conditions** : Texte non vide.
+- **Effet** : Résumé retourné ; aucun état modifié.
+- **Origine** : Faciliter la condensation de textes longs avant ou après récupération.
+- **Implémentation** : [gemini_client.py:85-106](../gemini_client.py)
+- **Tests fonctionnels** : (à confirmer)
+- **Évolutions** :
+  | Date | PR | Changement |
+  |---|---|---|
+  | 2026-05-21 | (à confirmer) | Création |
+
+#### RG-06 — Reranking zero-shot via liste CSV Gemini
+
+- **Énoncé** : `rerank_passages` soumet les passages numérotés à Gemini à `temperature=0.0` et attend une liste CSV d'indices ordonnés par pertinence. En cas d'échec de parsing ou d'indices invalides, l'ordre d'entrée est conservé.
+- **Pré-conditions** : Liste de passages non vide.
+- **Effet** : Passages retournés du plus au moins pertinent ; en cas d'erreur, ordre original préservé silencieusement.
+- **Origine** : Améliorer la précision du contexte transmis à Gemini après retrieval vectoriel.
+- **Implémentation** : [gemini_client.py:109-149](../gemini_client.py)
 - **Tests fonctionnels** : (à confirmer)
 - **Évolutions** :
   | Date | PR | Changement |

@@ -125,7 +125,7 @@ flowchart LR
 |---|---|---|---|---|---|
 | `main` | Module / point d'entrée | `main.py` | Boucle interactive CLI | Saisie utilisateur | Questions vers `RAGEngine`, réponses stdout |
 | `RAGEngine` | Module / classe | `rag_engine.py` | Orchestration : build ou chargement d'index, query | URL PDF, question texte | Réponse texte |
-| `gemini_client` | Module | `gemini_client.py` | Initialisation du LLM Gemini et enregistrement dans LlamaIndex Settings | `GOOGLE_API_KEY` (env) | Instance `Gemini` configurée dans `Settings.llm` |
+| `gemini_client` | Module | `gemini_client.py` | Singleton LLM Gemini : initialisation, accès, génération, résumé, reranking, reset | `GOOGLE_API_KEY` (env) | Instance `Gemini` via `get_llm()` ; texte généré via `generate_text` / `summarize` / `rerank_passages` |
 | `text_processor` | Module | `text_processor.py` | Configuration embedding HuggingFace et node parser | — | `HuggingFaceEmbedding` + `SentenceSplitter` enregistrés dans Settings |
 | `pdf_loader` | Module | `pdf_loader.py` | Téléchargement et parsing PDF | URL ou chemin local | Liste de documents LlamaIndex |
 
@@ -143,7 +143,15 @@ flowchart LR
 
 #### gemini_client
 
-- **Rôle** : Crée une instance `Gemini` (modèle `models/gemini-2.5-flash`, température 0.1) et l'enregistre dans `Settings.llm`.
+- **Rôle** : Gestion singleton du LLM Gemini — initialisation, accès, génération de texte, résumé, reranking de passages et reset.
+- **État interne** : `_state: dict = {"llm": None}` — singleton module-level ; une seule instance LLM partagée par le processus.
+- **API publique** :
+  - `initialize_gemini_llm(model, temperature, max_tokens) -> Gemini` — crée l'instance et l'enregistre dans `Settings.llm`
+  - `get_llm() -> Gemini` — retourne l'instance courante (ou lève si non initialisée)
+  - `generate_text(prompt, temperature) -> str` — génération directe via le LLM
+  - `summarize(text, max_words) -> str` — résumé en nombre de mots
+  - `rerank_passages(query, passages) -> list[str]` — reranking de passages par pertinence
+  - `reset_llm() -> None` — remet `_state["llm"]` à `None`
 - **Entrées** : Variable d'environnement `GOOGLE_API_KEY`
 - **Sorties** : Instance `Gemini` (et effet de bord sur `Settings.llm`)
 - **Dépendances externes** : Google Gemini API, `python-dotenv`
@@ -174,6 +182,11 @@ flowchart LR
 | Interface | Type | Consommateurs | Stabilité |
 |---|---|---|---|
 | `RAGEngine.query(question)` | API Python | `main.py` (CLI) | Interne / privé |
+| `gemini_client.generate_text(prompt, temperature)` | API Python | `rag_engine.py` (à confirmer) | Interne / privé |
+| `gemini_client.summarize(text, max_words)` | API Python | (à confirmer) | Interne / privé |
+| `gemini_client.rerank_passages(query, passages)` | API Python | (à confirmer) | Interne / privé |
+| `gemini_client.get_llm()` | API Python | (à confirmer) | Interne / privé |
+| `gemini_client.reset_llm()` | API Python | (à confirmer) | Interne / privé |
 
 ### 6.2 Interfaces consommées
 
