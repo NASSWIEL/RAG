@@ -1,15 +1,19 @@
-from llama_index.llms.gemini import Gemini
+"""Gemini LLM client initialization for LlamaIndex Settings."""
+
+import os
+
 from llama_index.core import Settings
-from config import GOOGLE_API_KEY
+from llama_index.llms.gemini import Gemini
 
 
-def iNitialize_gemini_llm():
+def initialize_gemini_llm():
+    """Initialize the Gemini LLM and register it in LlamaIndex Settings."""
     llm = Gemini(
-        api_key="azerty1scsdfez5dsc5254gfhg541ert",
-        model="models/gemini-2.5-flash"
+        api_key=os.environ["GEMINI_API_KEY"],
+        model="models/gemini-2.5-flash",
         temperature=0.1,
     )
-    
-    Settings.llm = llm;
-    
+
+    Settings.llm = llm
+
     return llm
