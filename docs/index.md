@@ -33,8 +33,8 @@ Bloc « Mode d'emploi » en fin de fichier pour l'IA et le relecteur.
 | La signature d'une API, d'un service, d'un événement | [contracts.md](contracts.md) |
 | Le sens d'un terme métier ou d'un acronyme | [glossaire.md](glossaire.md) |
 | Ce que le produit est censé faire (use cases, règles) | [fonctionnel.md](fonctionnel.md) |
-| Une décision d'architecture historique | [{{dossier ADR}}]({{dossier ADR}}) |
-| Comment lancer / déployer / contribuer | [{{README ou CONTRIBUTING}}]({{lien}}) |
+| Une décision d'architecture historique | — (aucun ADR pour l'instant) |
+| Comment lancer / déployer / contribuer | [README.md](../README.md) |
 
 ---
 
@@ -128,7 +128,7 @@ flowchart LR
 
 | Module / Service | Type | Fiche détaillée | Code source |
 |---|---|---|---|
-| {{Nom}} | {{API / Worker / UI / Lib}} | [{{chemin}}/{{nom}}.md]({{chemin}}/{{nom}}.md) | [{{chemin code}}]({{chemin code}}) |
+| — (pas de modules séparés) | — | — | — |
 
 ---
 
@@ -138,11 +138,11 @@ flowchart LR
 
 | Ressource | Rôle | Accès |
 |---|---|---|
-| {{Tickets / backlog}} | {{Suivi des features et bugs}} | {{Lien}} |
-| {{Dashboards observabilité}} | {{Métriques live, traces, logs}} | {{Lien}} |
-| {{Documentation API publique}} | {{OpenAPI / Postman / portail dev}} | {{Lien}} |
-| {{Espace Confluence / Notion / wiki}} | {{Décisions process, RH, comptes-rendus}} | {{Lien}} |
-| {{Runbooks ops}} | {{Procédures d'incident}} | {{Lien}} |
+| Tickets / backlog | Suivi des features et bugs | — |
+| Dashboards observabilité | Métriques live, traces, logs | — |
+| Documentation API publique | OpenAPI / Postman / portail dev | — |
+| Espace Confluence / Notion / wiki | Décisions process, RH, comptes-rendus | — |
+| Runbooks ops | Procédures d'incident | — |
 
 ---
 

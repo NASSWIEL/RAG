@@ -52,7 +52,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | Type d'interface | Mécanisme | Token / claims | Refresh / rotation |
 |---|---|---|---|
 | **API publique exposée** | N/A — bibliothèque locale | — | — |
-| **API Gemini (consommée)** | API key via variable d'environnement `GOOGLE_API_KEY` | Clé secrète chargée par `python-dotenv` | Manuelle (à confirmer) |
+| **API Gemini (consommée)** | API key via `GOOGLE_API_KEY` importée du module `config` | Clé secrète importée depuis `config.GOOGLE_API_KEY` (à confirmer — `config.py` absent de l'arborescence détectée) | Manuelle (à confirmer) |
 | **HuggingFace Hub (consommée)** | Téléchargement public (pas d'auth requise pour `BAAI/bge-small-en-v1.5`) | — | — |
 | **CLI** | Aucune — processus local | — | — |
 
@@ -122,11 +122,80 @@ N/A — bibliothèque Python. Les erreurs remontent par levée d'exception non g
 
 **Code source** : [gemini_client.py](../gemini_client.py)
 
-#### `initialize_gemini_llm() -> Gemini`
+Constantes de module : `_DEFAULT_MODEL = "models/gemini-2.5-flash"`, `_DEFAULT_TEMPERATURE = 0.1`, `_DEFAULT_MAX_TOKENS = 1024`. Le singleton LLM est maintenu dans `_llm_state` (dict mutable, évite l'usage de `global`).
 
-Initialise une instance `Gemini` avec `model="models/gemini-2.5-flash"`, `temperature=0.1`, et l'enregistre dans `Settings.llm` de LlamaIndex.
+**Pré-requis communs** : `GOOGLE_API_KEY` chargée depuis le module `config` (à confirmer — `config.py` non trouvé dans l'arborescence au moment de la génération de cette doc).
 
-**Pré-requis** : variable d'environnement `GOOGLE_API_KEY`.
+---
+
+#### `initialize_gemini_llm(model, temperature, max_tokens) -> Gemini`
+
+| Paramètre | Type | Défaut | Description |
+|---|---|---|---|
+| `model` | `str` | `"models/gemini-2.5-flash"` | Identifiant du modèle Gemini |
+| `temperature` | `float` | `0.1` | Température d'échantillonnage (0 = déterministe, 1 = créatif) |
+| `max_tokens` | `int` | `1024` | Nombre maximum de tokens générés |
+
+**Retour** : `Gemini` — instance configurée et enregistrée dans `Settings.llm` de LlamaIndex.
+
+**Effets de bord** : assigne `Settings.llm` et met à jour le singleton interne `_llm_state`.
+
+---
+
+#### `get_llm() -> Gemini`
+
+Retourne l'instance singleton courante. Si aucune instance n'existe encore, appelle `initialize_gemini_llm()` avec les valeurs par défaut.
+
+**Retour** : `Gemini` — instance LLM active.
+
+---
+
+#### `generate_text(prompt, temperature=None) -> str`
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `prompt` | `str` | Oui | Prompt texte envoyé à Gemini |
+| `temperature` | `float \| None` | Non (défaut `None`) | Override ponctuel de température ; crée une instance temporaire sans remplacer le singleton |
+
+**Retour** : `str` — texte de réponse du modèle.
+
+**Erreurs** : lève `ValueError` si `prompt` est vide ou ne contient que des espaces.
+
+**Note** : usage standalone (sans RAG), utile pour la génération, reformatage ou résumé direct.
+
+---
+
+#### `summarize(text, max_words=150) -> str`
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `text` | `str` | Oui | Texte source à résumer |
+| `max_words` | `int` | Non (défaut `150`) | Nombre de mots cible pour le résumé |
+
+**Retour** : `str` — résumé concis préservant les faits clés (délégué à `generate_text`).
+
+**Erreurs** : lève `ValueError` si `text` est vide.
+
+---
+
+#### `rerank_passages(query, passages) -> list[str]`
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `query` | `str` | Oui | Question utilisateur |
+| `passages` | `list[str]` | Oui | Liste de passages textuels à réordonner |
+
+**Retour** : `list[str]` — passages réordonnés du plus au moins pertinent par rapport à `query`. En cas d'échec de parsing de la réponse LLM, retourne l'ordre d'entrée inchangé (fallback silencieux).
+
+**Comportement interne** : utilise Gemini comme reranker zero-shot via `generate_text(temperature=0.0)`. Les passages omis par le modèle sont ajoutés en fin de liste.
+
+---
+
+#### `reset_llm() -> None`
+
+Réinitialise le singleton LLM (`_llm_state["instance"] = None`). Le prochain appel à `get_llm()` déclenchera une nouvelle initialisation.
+
+**Usage typique** : tests unitaires ou changement de configuration en cours d'exécution.
 
 ---
 
@@ -206,9 +275,9 @@ N/A — aucun job planifié ni batch défini dans le projet.
 
 ```python
 # Flux d'initialisation (RAGEngine.__init__)
-embed_model = setup_advanced_text_processing()   # text_processor → Settings.embed_model
-llm         = initialize_gemini_llm()            # gemini_client  → Settings.llm
-parser      = create_node_parser()               # text_processor → Settings.node_parser
+embed_model = setup_advanced_text_processing()        # text_processor → Settings.embed_model
+llm         = initialize_gemini_llm()                 # gemini_client  → Settings.llm (+ singleton)
+parser      = create_node_parser()                    # text_processor → Settings.node_parser
 
 # Si pas de cache :
 pdf_path    = load_pdf_from_url(pdf_url)         # pdf_loader     → HTTP GET + fichier tmp

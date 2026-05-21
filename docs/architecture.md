@@ -68,7 +68,7 @@ L'utilisateur entre ses questions dans une boucle interactive ; chaque question 
 | **Persistance** | Fichiers locaux (`./storage/`) | — | Sérialisation LlamaIndex `StorageContext.persist()` |
 | **Cache** | Aucun cache réseau — cache disque par hash MD5 de l'URL | — | Évite de re-générer les embeddings à chaque run |
 | **Messaging** | Aucun | — | — |
-| **Auth** | Variable d'environnement `GOOGLE_API_KEY` + `.env` (python-dotenv) | — | Clé API Google, jamais hardcodée |
+| **Auth** | Variable d'environnement `GOOGLE_API_KEY` lue via module `config` (à confirmer) | — | Clé API Google, jamais hardcodée |
 | **Observabilité** | `print()` stdout uniquement | — | Aucun collecteur structuré actuellement |
 | **CI/CD** | (à confirmer) | — | `pyproject.toml` configure ruff, pyright, bandit, pytest |
 | **Déploiement** | Local / script Python | — | Aucune infrastructure cloud observée |
@@ -125,7 +125,7 @@ flowchart LR
 | `RAGEngine` | Classe / Orchestrateur | [`rag_engine.py`](../rag_engine.py) | Orchestre indexation, cache et query pipeline | URL de PDF, question texte | Réponse texte |
 | `pdf_loader` | Module | [`pdf_loader.py`](../pdf_loader.py) | Télécharge et extrait le contenu d'un PDF | URL HTTP | Liste de `Document` LlamaIndex |
 | `text_processor` | Module | [`text_processor.py`](../text_processor.py) | Configure embeddings HuggingFace et `SentenceSplitter` | — | `HuggingFaceEmbedding`, `SentenceSplitter` |
-| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Initialise le LLM Gemini et l'enregistre dans `Settings` | `GOOGLE_API_KEY` (env) | Instance `Gemini` |
+| `gemini_client` | Module | [`gemini_client.py`](../gemini_client.py) | Initialise le LLM Gemini (singleton), l'enregistre dans `Settings`, et expose `generate_text`, `summarize`, `rerank_passages`, `reset_llm` | `GOOGLE_API_KEY` (via `config`) | Instance `Gemini` ; textes générés |
 | `main` | Script CLI | [`main.py`](../main.py) | Boucle interactive de questions-réponses | Stdin utilisateur | Stdout réponses |
 
 ### 4.1 Détails par composant
@@ -156,9 +156,10 @@ flowchart LR
 
 #### gemini_client
 
-- **Rôle** : Lit `GOOGLE_API_KEY` depuis l'environnement (`.env` via `python-dotenv`), instancie `Gemini(model="models/gemini-2.5-flash", temperature=0.1)` et l'enregistre dans `Settings.llm`.
-- **Dépendances externes** : Google Gemini API, `llama-index-llms-gemini`, `python-dotenv`
-- **Pièges connus** : ⚠️ Si `GOOGLE_API_KEY` est absente, `os.environ["GOOGLE_API_KEY"]` lève `KeyError` immédiatement au démarrage
+- **Rôle** : Lit `GOOGLE_API_KEY` depuis le module `config` (à confirmer — `config.py` non présent dans le repo), instancie `Gemini(model="models/gemini-2.5-flash", temperature=0.1, max_tokens=1024)` et l'enregistre dans `Settings.llm`. Expose un singleton (`_llm_state`) et des utilitaires de haut niveau : `generate_text()`, `summarize()`, `rerank_passages()`, `reset_llm()`.
+- **Constantes** : `_DEFAULT_MODEL = "models/gemini-2.5-flash"`, `_DEFAULT_TEMPERATURE = 0.1`, `_DEFAULT_MAX_TOKENS = 1024`
+- **Dépendances externes** : Google Gemini API, `llama-index-llms-gemini`
+- **Pièges connus** : ⚠️ Si le module `config` est absent ou si `GOOGLE_API_KEY` n'y est pas défini, l'import échoue dès le chargement du module (erreur à l'import, pas à l'appel)
 
 ---
 
@@ -234,7 +235,7 @@ Exécution locale uniquement (à confirmer) :
 |---|---|---|
 | **Authentification** | Clé API Google via variable d'environnement | `gemini_client.py`, `.env` |
 | **Autorisation** | Aucune — CLI mono-utilisateur | — |
-| **Secrets** | `GOOGLE_API_KEY` dans `.env` (non versionné) ; `python-dotenv` charge au runtime | `gemini_client.py` |
+| **Secrets** | `GOOGLE_API_KEY` importée via module `config` (à confirmer) ; `.env` non versionné | `gemini_client.py`, `config` (à confirmer) |
 | **Données sensibles** | Aucun chiffrement des index sur disque actuellement | `./storage/` |
 | **Audit** | Aucun mécanisme d'audit structuré — `print()` stdout uniquement | — |
 
@@ -307,6 +308,7 @@ Aucun ADR actuellement dans le repo.
 | Q2 | Pas de politique de purge du cache `./storage/` — croissance illimitée | Espace disque | (à confirmer) |
 | Q3 | Aucun timeout sur les appels Gemini — une réponse lente bloque l'utilisateur indéfiniment | UX | (à confirmer) |
 | Q4 | `pyproject.toml` ne déclare pas de section `[project]` avec les dépendances principales — versions non épinglées | Reproductibilité des builds | (à confirmer) |
+| Q5 | `gemini_client.py` importe `from config import GOOGLE_API_KEY` mais aucun module `config.py` n'est présent dans le repo — échec à l'import si non créé | Démarrage impossible | (à confirmer) |
 
 ### 11.3 Dette technique structurante
 

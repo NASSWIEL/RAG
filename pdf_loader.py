@@ -23,10 +23,11 @@ def load_pdf_from_url(url):
     temp_dir = tempfile.gettempdir()
     temp_path = os.path.join(temp_dir, "temp_rag_document.pdf")
 
-    with open(temp_path, 'wb') as f:
+    with open(temp_path, "wb") as f:
         f.write(response.content)
 
     return temp_path
+
 
 def load_documents_from_pdf(pdf_path):
     """Load and parse documents from a PDF file using PDFReader.

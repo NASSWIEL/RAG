@@ -41,6 +41,8 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Chunk** | Fragment de texte issu du découpage d'un document PDF, unité de base de l'indexation. Taille fixée à 512 tokens, chevauchement à 50. | `SentenceSplitter(chunk_size=512, chunk_overlap=50)` | `text_processor.py` |
 | **Node** | Objet LlamaIndex représentant un chunk enrichi de métadonnées, produit par le `node_parser`. | `Settings.node_parser` | `rag_engine.py`, `text_processor.py` |
 | **Stockage persistant** | Cache des embeddings sur disque, identifié par le hash MD5 de l'URL du PDF. Évite de re-encoder à chaque démarrage. | `storage_dir` (défaut `./storage`) | `rag_engine.py` |
+| **Reranking** | Opération post-retrieval : tri ou réordonnancement des passages récupérés avant injection dans le prompt LLM, pour améliorer la pertinence de la réponse. | `rerank_passages(query, passages)` | `gemini_client.py` |
+| **Summarization** | Résumé automatique d'un texte par le LLM, limité à un nombre de mots cible. Opération post-retrieval indépendante du pipeline RAG principal. | `summarize(text, max_words=150)` | `gemini_client.py` |
 
 ### 1.2 Règles de gestion (noms courts)
 
@@ -98,6 +100,7 @@ Projet Python monolithique, pas de sous-packages. Un fichier = un rôle fonction
 | `text_processor.py` | Embedding et découpage en chunks |
 | `gemini_client.py` | Initialisation du LLM Gemini |
 | `pdf_loader.py` | Chargement et lecture des PDFs |
+| `config.py` | Source de `GOOGLE_API_KEY` (à confirmer — fichier non trouvé dans le dépôt au moment de cette mise à jour) |
 
 ### 3.2 Classes
 
@@ -215,6 +218,7 @@ Projet Python monolithique, pas de sous-packages. Un fichier = un rôle fonction
 |---|---|---|
 | **RAG (Retrieval-Augmented Generation)** | Les chunks pertinents sont récupérés par similarité vectorielle avant d'être injectés dans le prompt du LLM. | `rag_engine.py` — méthode `query()` |
 | **Cache-par-empreinte** | Les embeddings sont persistés sur disque sous un nom dérivé du hash MD5 de l'URL source, évitant la ré-indexation. | `rag_engine.py` — `_get_index_path()` |
+| **Singleton LLM** | Instance unique du client Gemini maintenue dans `_llm_state` (dict module-level) et exposée via `get_llm()` / `reset_llm()`. Évite de ré-initialiser le client à chaque appel. | `gemini_client.py` — `_llm_state`, `get_llm()`, `reset_llm()` |
 
 ### 6.3 Démarche / process
 
