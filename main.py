@@ -6,7 +6,7 @@ def main():
     rag = RAGEngine(pdf_url)
     
     
-    print("\n\nInteractive mode - Enter your questions (type 'q' to exit):")
+    print("\n\nInteractive mode - Enter your questions (type 'q' to exit):)
     while True:
         user_query = input("\nYour question: ")
         if user_query.lower() in ['q']:
