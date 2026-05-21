@@ -41,10 +41,20 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Add your Google API key to `config.py`:
+### Variables d'environnement
 
-```python
-GOOGLE_API_KEY = "your-api-key-here"
+| Variable | Obligatoire | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | Oui | Clé API Google Gemini |
+
+Définis la variable avant de lancer le projet :
+
+```powershell
+$env:GOOGLE_API_KEY = "ta-clé-api"
+```
+
+```bash
+export GOOGLE_API_KEY="ta-clé-api"
 ```
 
 ## Usage

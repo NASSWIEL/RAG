@@ -1,12 +1,15 @@
+"""Entry point for the RAG-based interactive question-answering application."""
+
 from rag_engine import RAGEngine
 
+
 def main():
+    """Run the interactive RAG question-answering loop."""
     pdf_url = "https://arxiv.org/pdf/2005.11401.pdf"
-    
+
     rag = RAGEngine(pdf_url)
-    
-    
-    print("\n\nInteractive mode - Enter your questions (type 'q' to exit):)
+
+    print("\n\nInteractive mode - Enter your questions (type 'q' to exit):")
     while True:
         user_query = input("\nYour question: ")
         if user_query.lower() in ['q']:
