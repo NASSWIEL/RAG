@@ -42,6 +42,8 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Chunk** | Segment de texte produit par découpage d'un document PDF, de taille fixe (`chunk_size=512` tokens, chevauchement `chunk_overlap=50`). | `SentenceSplitter` dans `text_processor.py` | `text_processor.py` |
 | **Embedding** | Représentation vectorielle dense d'un chunk de texte, calculée par le modèle `BAAI/bge-small-en-v1.5`. | `HuggingFaceEmbedding` dans `text_processor.py` | `text_processor.py` |
 | **Node** | Unité d'indexation dans LlamaIndex, correspondant à un chunk enrichi de métadonnées (position dans le PDF, score de similarité). | `SentenceSplitter` → nœuds dans `rag_engine.py` | `rag_engine.py`, `text_processor.py` |
+| **Reranking (zero-shot)** | Étape post-retrieval où le LLM reclasse les passages récupérés par ordre de pertinence par rapport à la requête, sans entraînement spécifique. Améliore la précision en filtrant les faux positifs du vector store. | `rerank_passages(query, passages)` dans `gemini_client.py` | `gemini_client.py` |
+| **Résumé automatique** | Condensé d'un texte long produit par le LLM, limité à un nombre de mots cible (`max_words`). Utilisé pour compresser le contexte avant génération ou pour présenter un aperçu. | `summarize(text, max_words)` dans `gemini_client.py` | `gemini_client.py` |
 
 ### 1.2 Règles de gestion (noms courts)
 
@@ -187,6 +189,7 @@ Non applicable — pas d'événements asynchrones dans ce projet.
 |---|---|---|
 | **RAG (Retrieval-Augmented Generation)** | Récupération de contexte pertinent dans un index vectoriel avant génération LLM. | `RAGEngine` dans `rag_engine.py` |
 | **Cache sur disque (index vectoriel)** | L'index est persisté sur disque (hash MD5 de l'URL PDF) pour éviter le recalcul des embeddings. | `RAGEngine._get_index_path()`, `_save_index()`, `_load_index()` |
+| **LLM-as-reranker** | Usage du LLM (Gemini) comme reranker zero-shot : les passages récupérés par similarité vectorielle sont reclassés par le LLM sans aucun fine-tuning. Distinct du reranking par modèle dédié (ex. cross-encoder). | `rerank_passages()` dans `gemini_client.py` |
 
 ### 6.3 Démarche / process
 

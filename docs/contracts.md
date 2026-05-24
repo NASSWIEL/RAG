@@ -41,7 +41,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | **Topics / queues consommés** | 0 | — |
 | **Commandes CLI** | 0 | — |
 | **Jobs / batchs** | 0 | — |
-| **Méthodes / fonctions publiques Python** | 6 | Voir §2 |
+| **Méthodes / fonctions publiques Python** | 11 | Voir §2 |
 | **Fichiers E/S (formats fixes)** | 1 | PDF en entrée — voir §9 |
 
 ---
@@ -154,23 +154,93 @@ Bloc « Mode d'emploi » en fin de fichier.
 
 ---
 
-### 2.2 `gemini_client` — initialisation du LLM
+### 2.2 `gemini_client` — initialisation et utilitaires LLM
 
 **Code source** : [gemini_client.py](../gemini_client.py)
 
-#### `initialize_gemini_llm() -> Gemini` — configure et retourne le LLM Gemini
+#### `initialize_gemini_llm(model, temperature) -> Gemini` — configure et retourne le LLM Gemini
 
 | Méta | Valeur |
 |---|---|
-| **Code source** | [gemini_client.py:9](../gemini_client.py) |
+| **Code source** | [gemini_client.py](../gemini_client.py) |
 | **Auth requise** | `GOOGLE_API_KEY` (env) |
-| **Effets de bord** | Écrit `Settings.llm` dans le singleton global LlamaIndex |
+| **Effets de bord** | Écrit `Settings.llm` et `_state["llm"]` dans les singletons LlamaIndex et module |
+
+| Paramètre | Type | Obligatoire | Défaut | Description |
+|---|---|---|---|---|
+| `model` | `str` | Non | `"models/gemini-2.5-flash"` | Identifiant du modèle Gemini à utiliser |
+| `temperature` | `float` | Non | `0.1` | Température d'échantillonnage |
+
+**Retour** : instance `Gemini` configurée.
+
+- ⚠️ Modifie le singleton global `llama_index.core.Settings.llm` — tout appel ultérieur à LlamaIndex sans instanciation explicite utilisera ce LLM.
+
+---
+
+#### `get_llm() -> Gemini` — retourne le LLM courant (initialise si besoin)
+
+| Méta | Valeur |
+|---|---|
+| **Code source** | [gemini_client.py](../gemini_client.py) |
+| **Auth requise** | `GOOGLE_API_KEY` (env, si initialisation déclenchée) |
 
 **Paramètres** : aucun.
 
-**Retour** : instance `Gemini` configurée (`model="models/gemini-2.5-flash"`, `temperature=0.1`).
+**Retour** : instance `Gemini` active — appelle `initialize_gemini_llm()` avec les valeurs par défaut si `_state["llm"]` est `None`.
 
-- ⚠️ Modifie le singleton global `llama_index.core.Settings.llm` — tout appel ultérieur à LlamaIndex sans instanciation explicite utilisera ce LLM.
+---
+
+#### `generate_text(prompt, temperature) -> str` — génère du texte à partir d'un prompt
+
+| Méta | Valeur |
+|---|---|
+| **Code source** | [gemini_client.py](../gemini_client.py) |
+| **Auth requise** | `GOOGLE_API_KEY` (env) |
+
+| Paramètre | Type | Obligatoire | Défaut | Description |
+|---|---|---|---|---|
+| `prompt` | `str` | Oui | — | Texte du prompt ; doit être non vide |
+| `temperature` | `float \| None` | Non | `None` | Si fourni, crée une instance Gemini ad hoc avec cette température |
+
+**Retour** : `str` — réponse textuelle du modèle.
+
+**Erreurs** : `ValueError` si `prompt` est vide ou ne contient que des espaces.
+
+- ⚠️ Si `temperature` est fourni, une nouvelle instance `Gemini` est instanciée pour cet appel uniquement — coût de création à chaque appel.
+
+---
+
+#### `summarize(text, max_words) -> str` — résume un texte
+
+| Paramètre | Type | Obligatoire | Défaut | Description |
+|---|---|---|---|---|
+| `text` | `str` | Oui | — | Texte à résumer ; doit être non vide |
+| `max_words` | `int` | Non | `150` | Nombre de mots cible pour le résumé |
+
+**Retour** : `str` — résumé généré par le LLM.
+
+**Erreurs** : `ValueError` si `text` est vide ou ne contient que des espaces.
+
+---
+
+#### `rerank_passages(query, passages) -> list[str]` — réordonne des passages par pertinence
+
+| Paramètre | Type | Obligatoire | Description |
+|---|---|---|---|
+| `query` | `str` | Oui | Requête de référence pour le reranking |
+| `passages` | `list[str]` | Oui | Liste de passages à réordonner |
+
+**Retour** : `list[str]` — passages réordonnés par pertinence décroissante selon le LLM. Retourne `[]` si `passages` est vide. En cas d'erreur de parsing de la réponse LLM, retourne `passages` inchangé.
+
+- ⚠️ Appelle `generate_text` avec `temperature=0.0` pour maximiser la déterminisme.
+
+---
+
+#### `reset_llm() -> None` — réinitialise l'état interne du module
+
+**Paramètres** : aucun. **Retour** : `None`.
+
+**Effets de bord** : positionne `_state["llm"]` à `None` — le prochain appel à `get_llm()` déclenchera une nouvelle initialisation.
 
 ---
 
