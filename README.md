@@ -39,13 +39,25 @@ Install dependencies with:
 pip install -r requirements.txt
 ```
 
+Alternatively, if the project uses `pyproject.toml`:
+
+```bash
+pip install .
+```
+
 ## Configuration
 
-Add your Google API key to `config.py`:
+Définir la variable d'environnement suivante avant de lancer l'application :
 
-```python
-GOOGLE_API_KEY = "your-api-key-here"
+```bash
+$env:GOOGLE_API_KEY="your-api-key-here"   # PowerShell
+# ou
+export GOOGLE_API_KEY="your-api-key-here" # bash/zsh
 ```
+
+| Variable | Obligatoire | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | Oui | Clé API Google utilisée pour accéder à Gemini |
 
 ## Usage
 

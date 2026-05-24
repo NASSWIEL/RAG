@@ -155,6 +155,7 @@ answer = engine.query("What is the main contribution?")
 - ⚠️ L'identifiant du cache est le hash MD5 de l'URL **exacte** (sensible à la casse et aux paramètres query string) — deux URL pointant le même PDF mais différentes produisent deux index distincts.
 - ⚠️ `GOOGLE_API_KEY` doit être définie dans l'environnement ; l'absence lève `KeyError` sans message explicite.
 - ⚠️ `Settings` LlamaIndex est un singleton global — instancier plusieurs `RAGEngine` dans le même processus écrase les paramètres précédents.
+- ⚠️ `gemini_client` maintient un singleton `_state["llm"]` indépendant de `Settings` — appeler `reset_llm()` remet le singleton à `None` mais ne réinitialise pas `Settings.llm` ; les deux peuvent diverger si `initialize_gemini_llm` n'est pas rappelé explicitement.
 
 **Évolutions notables**
 
@@ -200,7 +201,7 @@ answer = engine.query("What is the main contribution?")
 | `rag_engine.py` (RAGEngine) | 🔀 (build + load) | ✍ (parsing) | 👁 (génération réponse) |
 | `pdf_loader.py` | — | — | — |
 | `text_processor.py` | — | ✍ (configuration parser) | — |
-| `gemini_client.py` | — | — | ✍ (init + config) |
+| `gemini_client.py` | — | 👁 (rerank via `rerank_passages`) | ✍ (init + config + reset) |
 | `main.py` | — | — | — |
 
 ---

@@ -122,7 +122,7 @@ flowchart LR
 | Composant | Type | Localisation | Rôle | Entrées | Sorties |
 |---|---|---|---|---|---|
 | `RAGEngine` | Classe | [`rag_engine.py`](rag_engine.py) | Orchestre indexation et requêtage | URL PDF, question utilisateur | Réponse textuelle |
-| `gemini_client` | Module | [`gemini_client.py`](gemini_client.py) | Initialise le LLM Gemini et l'enregistre dans `Settings` | `GOOGLE_API_KEY` env var | Instance `Gemini` configurée |
+| `gemini_client` | Module | [`gemini_client.py`](gemini_client.py) | Gère un singleton LLM Gemini et expose des fonctions utilitaires (`generate_text`, `summarize`, `rerank_passages`) | `GOOGLE_API_KEY` env var, prompt/texte | Instance `Gemini` ; texte généré |
 | `pdf_loader` | Module | [`pdf_loader.py`](pdf_loader.py) | Télécharge et parse un PDF | URL HTTP | Liste de `Document` LlamaIndex |
 | `text_processor` | Module | [`text_processor.py`](text_processor.py) | Configure embedding HuggingFace et `SentenceSplitter` | — | `HuggingFaceEmbedding`, `SentenceSplitter` |
 | `main` | Script | [`main.py`](main.py) | Point d'entrée CLI interactif | Saisie clavier | Sortie console |
@@ -141,11 +141,22 @@ flowchart LR
 
 #### gemini_client
 
-- **Rôle** : Instancie `Gemini(model="models/gemini-2.5-flash", temperature=0.1)` et l'enregistre dans `Settings.llm`.
-- **Entrées** : Variable d'environnement `GOOGLE_API_KEY`
-- **Sorties** : Instance `Gemini`
+- **Rôle** : Instancie et gère un singleton `Gemini` (modèle `models/gemini-2.5-flash`, température `0.1` par défaut), l'enregistre dans `Settings.llm`, et expose des fonctions utilitaires LLM de haut niveau.
+- **Entrées** : Variable d'environnement `GOOGLE_API_KEY` ; paramètres optionnels `model` et `temperature` dans `initialize_gemini_llm()`
+- **Sorties** : Instance `Gemini` ; texte généré (`str`)
+- **Fonctions publiques** :
+  | Fonction | Signature | Rôle |
+  |---|---|---|
+  | `initialize_gemini_llm` | `(model, temperature) → Gemini` | Instancie et enregistre le LLM ; stocke dans `_state` |
+  | `get_llm` | `() → Gemini` | Retourne le singleton, l'initialise si absent |
+  | `generate_text` | `(prompt, temperature?) → str` | Appel LLM générique ; crée une instance temporaire si `temperature` est fournie |
+  | `summarize` | `(text, max_words?) → str` | Résumé en ~N mots via `generate_text` |
+  | `rerank_passages` | `(query, passages) → list[str]` | Trie les passages par pertinence via un prompt LLM à `temperature=0.0` |
+  | `reset_llm` | `() → None` | Réinitialise le singleton (`_state["llm"] = None`) |
 - **Dépendances externes** : Google Gemini API
-- **Pièges connus** : ⚠️ `os.environ["GOOGLE_API_KEY"]` lève `KeyError` si la variable est absente — pas de message d'erreur explicite.
+- **Pièges connus** :
+  - ⚠️ `os.environ["GOOGLE_API_KEY"]` lève `KeyError` si la variable est absente — pas de message d'erreur explicite.
+  - ⚠️ `generate_text` avec `temperature` explicite crée une nouvelle instance `Gemini` à chaque appel — pas de réutilisation du singleton.
 
 ---
 
@@ -292,6 +303,7 @@ Machine locale
 | Q1 | L'URL du PDF est hardcodée dans `main.py` — pas configurable en argument CLI | Limité à un seul document sans modifier le code | (à confirmer) |
 | Q2 | Le cache n'est pas invalidé si le contenu du PDF à l'URL change (seule l'URL est hashée) | Réponses potentiellement obsolètes si le PDF est mis à jour | (à confirmer) |
 | Q3 | `GOOGLE_API_KEY` absente lève un `KeyError` sans message d'erreur utilisateur | Expérience dégradée au démarrage | (à confirmer) |
+| Q4 | `generate_text` avec `temperature` explicite instancie un nouveau `Gemini` à chaque appel — coût potentiel si appelé en boucle | Performance dégradée sur usage intensif de `rerank_passages` | (à confirmer) |
 
 ### 11.3 Dette technique structurante
 
