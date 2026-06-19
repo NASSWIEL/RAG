@@ -19,6 +19,9 @@ def load_pdf_from_url(url):
     """
     print(f"Downloading PDF from {url}...")
     response = requests.get(url, timeout=30)
+    # Fail fast on HTTP errors instead of writing an error page into a .pdf file,
+    # which would otherwise surface as a confusing parse failure downstream.
+    response.raise_for_status()
 
     temp_dir = tempfile.gettempdir()
     temp_path = os.path.join(temp_dir, "temp_rag_document.pdf")
