@@ -6,3 +6,5 @@ llama-index-readers-file
 sentence-transformers
 torch
 pypdf
+fastapi
+uvicorn

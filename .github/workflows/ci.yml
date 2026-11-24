@@ -50,3 +50,10 @@ jobs:
       - run: pip install pytest pytest-cov
       # Threshold just under today's 55% so coverage can only go up.
       - run: pytest --cov=. --cov-fail-under=50
+
+  docker:
+    # Catches a broken Dockerfile before CD hands it to Render.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t rag:ci .
