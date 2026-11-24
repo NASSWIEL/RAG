@@ -4,12 +4,20 @@ import contextlib
 import hashlib
 import os
 import shutil
+import tempfile
+import time
+from urllib.parse import urlparse
 
 from llama_index.core import Settings, StorageContext, VectorStoreIndex, load_index_from_storage
 
 from gemini_client import initialize_gemini_llm
 from pdf_loader import load_documents_from_pdf, load_pdf_from_url
 from text_processor import create_node_parser, setup_advanced_text_processing
+
+# Written last inside a saved index; its absence means the folder is incomplete.
+_COMPLETE_MARKER = "_complete"
+_REPLACE_ATTEMPTS = 5
+_REPLACE_RETRY_DELAY_S = 0.5
 
 
 class RAGEngine:
@@ -32,7 +40,7 @@ class RAGEngine:
 
         index_path = self._get_index_path()
 
-        if os.path.exists(index_path):
+        if self._is_complete(index_path):
             print("Found existing embeddings for this PDF! Loading from cache...")
             print(f"Storage location: {index_path}")
             self.index = self._load_index(index_path)
@@ -44,7 +52,8 @@ class RAGEngine:
 
             print("Extracting documents from PDF...")
             try:
-                documents = load_documents_from_pdf(pdf_path)
+                source_name = os.path.basename(urlparse(pdf_url).path) or "document.pdf"
+                documents = load_documents_from_pdf(pdf_path, file_name=source_name)
             finally:
                 # A cleanup failure (e.g. antivirus lock on Windows) must not mask the parse result.
                 with contextlib.suppress(OSError):
@@ -66,14 +75,39 @@ class RAGEngine:
         url_hash = hashlib.md5(self.pdf_url.encode(), usedforsecurity=False).hexdigest()
         return os.path.join(self.storage_dir, f"index_{url_hash}")
 
+    @staticmethod
+    def _is_complete(index_path):
+        return os.path.exists(os.path.join(index_path, _COMPLETE_MARKER))
+
     def _save_index(self, index_path):
-        # Write to a temp dir then rename, so a failed persist never leaves a half-written
-        # index_path that the cache check would treat as valid.
-        tmp_path = index_path + ".tmp"
-        shutil.rmtree(tmp_path, ignore_errors=True)
-        os.makedirs(tmp_path)
-        self.index.storage_context.persist(persist_dir=tmp_path)
-        os.replace(tmp_path, index_path)
+        # Persist into a per-run temp dir, then rename it into place, so concurrent runs never
+        # share a folder and a failed persist never leaves an index_path that looks valid.
+        os.makedirs(self.storage_dir, exist_ok=True)
+        tmp_path = tempfile.mkdtemp(
+            prefix=os.path.basename(index_path) + ".", suffix=".tmp", dir=self.storage_dir
+        )
+        try:
+            self.index.storage_context.persist(persist_dir=tmp_path)
+            with open(os.path.join(tmp_path, _COMPLETE_MARKER), "w", encoding="utf-8"):
+                pass
+            if os.path.exists(index_path) and not self._is_complete(index_path):
+                shutil.rmtree(index_path)
+            self._replace_dir(tmp_path, index_path)
+        finally:
+            shutil.rmtree(tmp_path, ignore_errors=True)
+
+    def _replace_dir(self, tmp_path, index_path):
+        # Retries cover Windows antivirus/indexer handles that briefly block a directory rename.
+        for attempt in range(_REPLACE_ATTEMPTS):
+            try:
+                os.replace(tmp_path, index_path)
+                return
+            except OSError:
+                if self._is_complete(index_path):
+                    return  # Another run saved the same index first.
+                if attempt == _REPLACE_ATTEMPTS - 1:
+                    raise
+                time.sleep(_REPLACE_RETRY_DELAY_S)
 
     def _load_index(self, index_path):
         storage_context = StorageContext.from_defaults(persist_dir=index_path)

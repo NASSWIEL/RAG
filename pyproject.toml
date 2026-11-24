@@ -66,7 +66,7 @@ quote-style = "double"
 indent-style = "space"
 [tool.pyright]
 include = ["."]
-exclude = ["**/__pycache__", "**/.venv"]
+exclude = ["**/__pycache__", "**/.venv", "**/venv", "**/node_modules", "**/.*", "storage", "build"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 reportMissingImports = "error"
