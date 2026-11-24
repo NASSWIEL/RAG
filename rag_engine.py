@@ -1,7 +1,9 @@
 """RAG engine for building and querying a vector index from a PDF document."""
 
+import contextlib
 import hashlib
 import os
+import shutil
 
 from llama_index.core import Settings, StorageContext, VectorStoreIndex, load_index_from_storage
 
@@ -41,7 +43,12 @@ class RAGEngine:
             pdf_path = load_pdf_from_url(pdf_url)
 
             print("Extracting documents from PDF...")
-            documents = load_documents_from_pdf(pdf_path)
+            try:
+                documents = load_documents_from_pdf(pdf_path)
+            finally:
+                # A cleanup failure (e.g. antivirus lock on Windows) must not mask the parse result.
+                with contextlib.suppress(OSError):
+                    os.remove(pdf_path)
 
             print("Building vector index with semantic search...")
             self.index = VectorStoreIndex.from_documents(documents, show_progress=True)
@@ -60,8 +67,13 @@ class RAGEngine:
         return os.path.join(self.storage_dir, f"index_{url_hash}")
 
     def _save_index(self, index_path):
-        os.makedirs(index_path, exist_ok=True)
-        self.index.storage_context.persist(persist_dir=index_path)
+        # Write to a temp dir then rename, so a failed persist never leaves a half-written
+        # index_path that the cache check would treat as valid.
+        tmp_path = index_path + ".tmp"
+        shutil.rmtree(tmp_path, ignore_errors=True)
+        os.makedirs(tmp_path)
+        self.index.storage_context.persist(persist_dir=tmp_path)
+        os.replace(tmp_path, index_path)
 
     def _load_index(self, index_path):
         storage_context = StorageContext.from_defaults(persist_dir=index_path)

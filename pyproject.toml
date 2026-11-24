@@ -65,7 +65,7 @@ max-doc-length = 200
 quote-style = "double"
 indent-style = "space"
 [tool.pyright]
-include = ["src", "tests"]
+include = ["."]
 exclude = ["**/__pycache__", "**/.venv"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"

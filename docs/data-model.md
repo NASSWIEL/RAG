@@ -276,7 +276,6 @@ Sans objet — pas d'outil de migration DDL. L'évolution du schéma de données
 
 1. **Ajouter un mécanisme d'invalidation du cache disque** — un changement de `chunk_size`, `chunk_overlap` ou de modèle d'embedding rend les index existants silencieusement incohérents ; stocker un manifeste de configuration dans le répertoire d'index permettrait de détecter ce cas.
 2. **Remplacer `print()` par un logger structuré** — les logs actuels ne sont pas filtrables par niveau ni capturables par un système d'observabilité.
-3. **Gérer explicitement les erreurs réseau dans `load_pdf_from_url`** — timeout de 30s défini mais les codes HTTP d'erreur ne sont pas vérifiés (`response.raise_for_status()` manquant). (à confirmer)
 
 ---
 

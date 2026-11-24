@@ -1,6 +1,5 @@
 """Utilities for loading PDF documents from URLs or local paths."""
 
-import os
 import tempfile
 from pathlib import Path
 
@@ -19,14 +18,12 @@ def load_pdf_from_url(url):
     """
     print(f"Downloading PDF from {url}...")
     response = requests.get(url, timeout=30)
+    response.raise_for_status()
 
-    temp_dir = tempfile.gettempdir()
-    temp_path = os.path.join(temp_dir, "temp_rag_document.pdf")
-
-    with open(temp_path, 'wb') as f:
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
         f.write(response.content)
 
-    return temp_path
+    return f.name
 
 def load_documents_from_pdf(pdf_path):
     """Load documents from a local PDF file using PDFReader.

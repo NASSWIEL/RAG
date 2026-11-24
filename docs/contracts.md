@@ -254,11 +254,9 @@ Bloc « Mode d'emploi » en fin de fichier.
 |---|---|---|---|
 | `url` | `str` | Oui | URL HTTP(S) du PDF à télécharger |
 
-**Retour** : `str` — chemin local du fichier temporaire (`tempfile.gettempdir()/temp_rag_document.pdf`).
+**Retour** : `str` — chemin local d'un fichier temporaire `.pdf` au nom unique (`tempfile.NamedTemporaryFile`), supprimé par `RAGEngine` après lecture.
 
-**Effets de bord** : requête GET avec timeout 30 s ; écrit dans le répertoire temporaire système.
-
-- ⚠️ Le fichier temporaire est toujours nommé `temp_rag_document.pdf` — appels parallèles s'écrasent mutuellement.
+**Effets de bord** : requête GET avec timeout 30 s ; lève `requests.HTTPError` sur un code HTTP 4xx/5xx ; écrit dans le répertoire temporaire système.
 
 ---
 
@@ -390,10 +388,10 @@ answer = engine.query("Quelle est la conclusion du document ?")
 
 | Composant | Scope transactionnel | Commit | Rollback |
 |---|---|---|---|
-| `RAGEngine.__init__` (écriture index) | Aucun — écriture fichiers locaux | Implicite (fin d'écriture disque) | Aucun — répertoire partiel possible si interruption |
+| `RAGEngine.__init__` (écriture index) | Aucun — écriture fichiers locaux | Renommage de `index_<hash>.tmp` en `index_<hash>` une fois l'écriture terminée | Aucun — un `.tmp` partiel peut rester, il est écrasé au lancement suivant |
 | `RAGEngine.query` | Aucun (lecture seule) | N/A | N/A |
 
-> Cas critiques : si `RAGEngine.__init__` est interrompu pendant `_save_index`, le répertoire de cache peut être incomplet. Au prochain lancement, `os.path.exists(index_path)` peut renvoyer `True` sur un index corrompu (à confirmer).
+> Cas critiques : si `RAGEngine.__init__` est interrompu pendant `_save_index`, seul le répertoire `.tmp` est incomplet ; `index_path` n'existe pas et l'index est reconstruit au prochain lancement. Un répertoire incomplet laissé par une version antérieure du code reste chargé comme valide.
 
 ---
 
@@ -403,7 +401,7 @@ answer = engine.query("Quelle est la conclusion du document ?")
 |---|---|---|---|---|
 | `RAGEngine.__init__` | (à confirmer) | (à confirmer) | Oui — cache MD5 sur `pdf_url` | Non — ne pas appeler en parallèle sur le même `storage_dir` |
 | `RAGEngine.query` | (à confirmer) | Dépend de Gemini API | Oui (lecture seule) | Oui |
-| `load_pdf_from_url` | ≤ 30 s (timeout) | Dépend de la source | Non — écrase toujours le même fichier temp | Non |
+| `load_pdf_from_url` | ≤ 30 s (timeout) | Dépend de la source | Non — crée un nouveau fichier temp à chaque appel | Oui |
 
 ---
 
