@@ -1,5 +1,6 @@
 """Utilities for loading PDF documents from URLs or local paths."""
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -26,17 +27,19 @@ def load_pdf_from_url(url):
     print(f"Downloading PDF from {url}...")
     response = requests.get(url, timeout=30)
     response.raise_for_status()
-    if not response.content.startswith(b"%PDF"):
+    # PDF readers accept a short preamble (BOM, whitespace) before the header.
+    if b"%PDF" not in response.content[:1024]:
         content_type = response.headers.get("Content-Type", "unknown")
         raise ValueError(f"URL did not return a PDF (Content-Type: {content_type}): {url}")
 
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-        try:
+    f = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    try:
+        with f:
             f.write(response.content)
-        except BaseException:
-            f.close()
+    except BaseException:
+        with contextlib.suppress(OSError):
             os.remove(f.name)
-            raise
+        raise
 
     return f.name
 

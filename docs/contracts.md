@@ -256,7 +256,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 
 **Retour** : `str` — chemin local d'un fichier temporaire `.pdf` au nom unique (`tempfile.NamedTemporaryFile`), supprimé par `RAGEngine` après lecture.
 
-**Effets de bord** : requête GET avec timeout 30 s ; lève `requests.HTTPError` sur un code HTTP 4xx/5xx et `ValueError` si le contenu ne commence pas par `%PDF` ; écrit dans le répertoire temporaire système (fichier supprimé si l'écriture échoue).
+**Effets de bord** : requête GET avec timeout 30 s ; lève `requests.HTTPError` sur un code HTTP 4xx/5xx et `ValueError` si `%PDF` n'apparaît pas dans les 1024 premiers octets ; écrit dans le répertoire temporaire système (fichier supprimé si l'écriture échoue).
 
 ---
 
@@ -265,7 +265,7 @@ Bloc « Mode d'emploi » en fin de fichier.
 | Paramètre | Type | Obligatoire | Description |
 |---|---|---|---|
 | `pdf_path` | `str` | Oui | Chemin local vers le fichier PDF |
-| `file_name` | `str` | Non | Nom stocké dans la métadonnée `file_name` de chaque document à la place du nom du fichier local (`RAGEngine` passe le nom tiré de l'URL) |
+| `file_name` | `str` | Non | Nom stocké dans la métadonnée `file_name` de chaque document à la place du nom du fichier local (`RAGEngine` passe le nom décodé tiré de l'URL, ou `document.pdf` s'il ne finit pas par `.pdf`) |
 
 **Retour** : `list` de documents LlamaIndex extraits par `PDFReader`.
 
@@ -389,7 +389,7 @@ answer = engine.query("Quelle est la conclusion du document ?")
 
 | Composant | Scope transactionnel | Commit | Rollback |
 |---|---|---|---|
-| `RAGEngine.__init__` (écriture index) | Aucun — écriture fichiers locaux | Écriture dans un dossier temporaire unique, ajout du marqueur `_complete`, puis renommage en `index_<hash>` | Dossier temporaire supprimé en cas d'échec |
+| `RAGEngine.__init__` (écriture index) | Aucun — écriture fichiers locaux | Écriture dans un dossier temporaire unique, ajout du marqueur `_complete`, puis renommage en `index_<hash>` | Dossier temporaire supprimé en cas d'échec ; ceux de plus d'une heure laissés par un lancement interrompu sont supprimés à la sauvegarde suivante |
 | `RAGEngine.query` | Aucun (lecture seule) | N/A | N/A |
 
 > Cas critiques : le cache n'est chargé que si `index_<hash>/_complete` existe. Un index interrompu, ou écrit par une version antérieure du code (sans marqueur), est reconstruit au lancement suivant. Si un autre lancement a déjà sauvegardé le même index, le renommage échoue et l'index existant est conservé.

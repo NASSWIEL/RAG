@@ -252,7 +252,7 @@ stateDiagram-v2
 
 | Cas | Comportement attendu | Justification |
 |---|---|---|
-| **PDF inaccessible** | Crash non géré (exception Python) | Aucune gestion d'erreur explicite sur le téléchargement (à confirmer) |
+| **PDF inaccessible** | Arrêt avec `requests.HTTPError` (code 4xx/5xx) ou `ValueError` (contenu qui n'est pas un PDF) | `load_pdf_from_url` vérifie le code HTTP et la présence de `%PDF` dans les 1024 premiers octets |
 | **PDF très volumineux** | Embedding long, potentiellement hors mémoire | Pas de limite de taille documentée (à confirmer) |
 | **Question vide** | Transmise au moteur — réponse potentiellement incohérente | La validation de l'entrée n'est pas implémentée |
 | **Cache incomplet** | Index reconstruit au lancement | Le cache n'est chargé que si le marqueur `_complete` est présent |

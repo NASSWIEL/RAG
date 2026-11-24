@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 import time
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from llama_index.core import Settings, StorageContext, VectorStoreIndex, load_index_from_storage
 
@@ -18,6 +18,8 @@ from text_processor import create_node_parser, setup_advanced_text_processing
 _COMPLETE_MARKER = "_complete"
 _REPLACE_ATTEMPTS = 5
 _REPLACE_RETRY_DELAY_S = 0.5
+# Older than any realistic persist, so a temp dir of a run still in progress is never removed.
+_STALE_TMP_AGE_S = 3600
 
 
 class RAGEngine:
@@ -52,7 +54,9 @@ class RAGEngine:
 
             print("Extracting documents from PDF...")
             try:
-                source_name = os.path.basename(urlparse(pdf_url).path) or "document.pdf"
+                source_name = unquote(os.path.basename(urlparse(pdf_url).path))
+                if not source_name.lower().endswith(".pdf"):
+                    source_name = "document.pdf"
                 documents = load_documents_from_pdf(pdf_path, file_name=source_name)
             finally:
                 # A cleanup failure (e.g. antivirus lock on Windows) must not mask the parse result.
@@ -83,6 +87,7 @@ class RAGEngine:
         # Persist into a per-run temp dir, then rename it into place, so concurrent runs never
         # share a folder and a failed persist never leaves an index_path that looks valid.
         os.makedirs(self.storage_dir, exist_ok=True)
+        self._remove_stale_tmp_dirs(index_path)
         tmp_path = tempfile.mkdtemp(
             prefix=os.path.basename(index_path) + ".", suffix=".tmp", dir=self.storage_dir
         )
@@ -90,21 +95,37 @@ class RAGEngine:
             self.index.storage_context.persist(persist_dir=tmp_path)
             with open(os.path.join(tmp_path, _COMPLETE_MARKER), "w", encoding="utf-8"):
                 pass
-            if os.path.exists(index_path) and not self._is_complete(index_path):
-                shutil.rmtree(index_path)
             self._replace_dir(tmp_path, index_path)
         finally:
             shutil.rmtree(tmp_path, ignore_errors=True)
 
+    def _remove_stale_tmp_dirs(self, index_path):
+        prefix = os.path.basename(index_path) + "."
+        now = time.time()
+        for name in os.listdir(self.storage_dir):
+            path = os.path.join(self.storage_dir, name)
+            if not (name.startswith(prefix) and name.endswith(".tmp") and os.path.isdir(path)):
+                continue
+            with contextlib.suppress(OSError):
+                if now - os.path.getmtime(path) > _STALE_TMP_AGE_S:
+                    shutil.rmtree(path, ignore_errors=True)
+
     def _replace_dir(self, tmp_path, index_path):
-        # Retries cover Windows antivirus/indexer handles that briefly block a directory rename.
+        # Retries cover Windows antivirus/indexer handles that briefly block a directory
+        # rename or delete, and another run removing the same incomplete folder concurrently.
         for attempt in range(_REPLACE_ATTEMPTS):
+            if os.path.exists(index_path) and not self._is_complete(index_path):
+                shutil.rmtree(index_path, ignore_errors=True)
             try:
                 os.replace(tmp_path, index_path)
                 return
             except OSError:
                 if self._is_complete(index_path):
-                    return  # Another run saved the same index first.
+                    print(
+                        f"Another run already saved a complete index at {index_path}; "
+                        "keeping it and discarding this one."
+                    )
+                    return
                 if attempt == _REPLACE_ATTEMPTS - 1:
                     raise
                 time.sleep(_REPLACE_RETRY_DELAY_S)
