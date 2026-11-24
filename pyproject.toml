@@ -65,8 +65,8 @@ max-doc-length = 200
 quote-style = "double"
 indent-style = "space"
 [tool.pyright]
-include = ["src", "tests"]
-exclude = ["**/__pycache__", "**/.venv"]
+include = ["."]
+exclude = ["**/__pycache__", "**/.venv", "**/venv", "**/node_modules", "**/.*", "storage", "build"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 reportMissingImports = "error"

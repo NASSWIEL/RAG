@@ -254,19 +254,18 @@ Bloc « Mode d'emploi » en fin de fichier.
 |---|---|---|---|
 | `url` | `str` | Oui | URL HTTP(S) du PDF à télécharger |
 
-**Retour** : `str` — chemin local du fichier temporaire (`tempfile.gettempdir()/temp_rag_document.pdf`).
+**Retour** : `str` — chemin local d'un fichier temporaire `.pdf` au nom unique (`tempfile.NamedTemporaryFile`), supprimé par `RAGEngine` après lecture.
 
-**Effets de bord** : requête GET avec timeout 30 s ; écrit dans le répertoire temporaire système.
-
-- ⚠️ Le fichier temporaire est toujours nommé `temp_rag_document.pdf` — appels parallèles s'écrasent mutuellement.
+**Effets de bord** : requête GET avec timeout 30 s ; lève `requests.HTTPError` sur un code HTTP 4xx/5xx et `ValueError` si `%PDF` n'apparaît pas dans les 1024 premiers octets ; écrit dans le répertoire temporaire système (fichier supprimé si l'écriture échoue).
 
 ---
 
-#### `load_documents_from_pdf(pdf_path) -> list` — parse un PDF local
+#### `load_documents_from_pdf(pdf_path, file_name=None) -> list` — parse un PDF local
 
 | Paramètre | Type | Obligatoire | Description |
 |---|---|---|---|
 | `pdf_path` | `str` | Oui | Chemin local vers le fichier PDF |
+| `file_name` | `str` | Non | Nom stocké dans la métadonnée `file_name` de chaque document à la place du nom du fichier local (`RAGEngine` passe le nom décodé tiré de l'URL, ou `document.pdf` s'il ne finit pas par `.pdf`) |
 
 **Retour** : `list` de documents LlamaIndex extraits par `PDFReader`.
 
@@ -390,10 +389,10 @@ answer = engine.query("Quelle est la conclusion du document ?")
 
 | Composant | Scope transactionnel | Commit | Rollback |
 |---|---|---|---|
-| `RAGEngine.__init__` (écriture index) | Aucun — écriture fichiers locaux | Implicite (fin d'écriture disque) | Aucun — répertoire partiel possible si interruption |
+| `RAGEngine.__init__` (écriture index) | Aucun — écriture fichiers locaux | Écriture dans un dossier temporaire unique, ajout du marqueur `_complete`, puis renommage en `index_<hash>` | Dossier temporaire supprimé en cas d'échec ; ceux de plus d'une heure laissés par un lancement interrompu sont supprimés à la sauvegarde suivante |
 | `RAGEngine.query` | Aucun (lecture seule) | N/A | N/A |
 
-> Cas critiques : si `RAGEngine.__init__` est interrompu pendant `_save_index`, le répertoire de cache peut être incomplet. Au prochain lancement, `os.path.exists(index_path)` peut renvoyer `True` sur un index corrompu (à confirmer).
+> Cas critiques : le cache n'est chargé que si `index_<hash>/_complete` existe. Un index interrompu, ou écrit par une version antérieure du code (sans marqueur), est reconstruit au lancement suivant. Si un autre lancement a déjà sauvegardé le même index, le renommage échoue et l'index existant est conservé.
 
 ---
 
@@ -401,9 +400,9 @@ answer = engine.query("Quelle est la conclusion du document ?")
 
 | Interface | Latence p95 cible | Disponibilité | Idempotence | Re-entrance |
 |---|---|---|---|---|
-| `RAGEngine.__init__` | (à confirmer) | (à confirmer) | Oui — cache MD5 sur `pdf_url` | Non — ne pas appeler en parallèle sur le même `storage_dir` |
+| `RAGEngine.__init__` | (à confirmer) | (à confirmer) | Oui — cache MD5 sur `pdf_url` | Oui — chaque lancement écrit dans son propre dossier temporaire ; le premier index complet est conservé |
 | `RAGEngine.query` | (à confirmer) | Dépend de Gemini API | Oui (lecture seule) | Oui |
-| `load_pdf_from_url` | ≤ 30 s (timeout) | Dépend de la source | Non — écrase toujours le même fichier temp | Non |
+| `load_pdf_from_url` | ≤ 30 s (timeout) | Dépend de la source | Non — crée un nouveau fichier temp à chaque appel | Oui |
 
 ---
 
@@ -418,8 +417,7 @@ answer = engine.query("Quelle est la conclusion du document ?")
 ## 13. Recommandations actives
 
 1. **Ajouter un mécanisme de retry sur `load_pdf_from_url`** — actuellement une seule tentative avec timeout 30 s ; les PDF volumineux ou les réseaux instables entraînent un `ConnectionError` non récupéré (à confirmer).
-2. **Valider l'intégrité du cache avant chargement** — `_load_index` ne vérifie pas que le répertoire est complet ; un index corrompu produit une erreur opaque de LlamaIndex (à confirmer).
-3. **Ajouter `GOOGLE_API_KEY` au message d'erreur** — le `KeyError` brut n'indique pas à l'utilisateur quelle variable est manquante.
+2. **Ajouter `GOOGLE_API_KEY` au message d'erreur** — le `KeyError` brut n'indique pas à l'utilisateur quelle variable est manquante.
 
 ---
 
