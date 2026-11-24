@@ -5,15 +5,48 @@ on:
   push:
     branches: [main]
 
+# A new push on the same branch cancels the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  checks:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install ruff pytest
+          cache: pip
+      # pyright needs the real dependencies to resolve imports; CPU torch avoids multi-GB CUDA wheels.
+      - run: pip install -r requirements.txt ruff pyright --extra-index-url https://download.pytorch.org/whl/cpu
       # tests/ is excluded until its existing lint errors are fixed.
       - run: ruff check . --exclude tests
-      - run: pytest
+      - run: pyright
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install bandit
+      - run: bandit -r . -c pyproject.toml
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      # Tests mock llama_index, so the heavy requirements are not needed here.
+      - run: pip install pytest pytest-cov
+      # Threshold just under today's 55% so coverage can only go up.
+      - run: pytest --cov=. --cov-fail-under=50
