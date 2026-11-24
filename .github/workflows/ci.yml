@@ -20,7 +20,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       # pyright needs the real dependencies to resolve imports; CPU torch avoids multi-GB CUDA wheels.
-      - run: pip install -r requirements.txt ruff pyright --extra-index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r requirements.txt ruff pyright pytest --extra-index-url https://download.pytorch.org/whl/cpu
       # tests/ is excluded until its existing lint errors are fixed.
       - run: ruff check . --exclude tests
       - run: pyright
